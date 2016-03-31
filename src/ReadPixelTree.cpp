@@ -32,14 +32,20 @@ using namespace std;
 #include "TRandom.h"
 #include "TChain.h"
 
-void Prueba();
+void Prueba(char *rootFilePath, char *outputPath);
 
 TChain * ReadPixRootFile(const char *fileName);
 
-const char *rootFilePath = "~/Data/psi_2015_10/root/pixel/test151000312_withTracks.root";
+const char *rootFilePathComplete = "~/Data/psi_2015_10/root/pixel/test151000312_withTracks.root";
+const char *rootFilePathSmall = "~/DataSmall/psi_2015_10/root/pixel/TrackedRun312.root";
+
+const char *outputPathComplete = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/";
+const char *outputPathSmall = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/Small/";
 
 int main() {
-	Prueba();
+	const char *rootFilePath = rootFilePathSmall;
+	const char *outputPath = outputPathSmall;
+	Prueba((char *)rootFilePath, (char *)outputPath);
 	return 0;
 }
 
@@ -49,7 +55,7 @@ TChain * ReadPixRootFile(const char *fileName){
 	return chain1;
 }
 
-void Prueba(){
+void Prueba(char *rootFilePath,char *outputPath){
 	//Create Chain to read tree
 	TChain *chain1 = ReadPixRootFile(rootFilePath);
 	//Make pointers to branches
@@ -67,7 +73,7 @@ void Prueba(){
 	vector<int> *plane=0, *col=0, *row=0, *adc=0, *charge=0;
 	Float_t time=0, dia1X=0, dia1Y=0, dia2X=0, dia2Y=0;
 	//dimension variables
-	Char_t numPlane = 0, numCol = 0, numRow = 0, numADC = 0, numCharge = 0;
+	Int_t numPlane = 0, numCol = 0, numRow = 0, numADC = 0, numCharge = 0;
 	Long64_t numEntries = braPlane->GetEntries();
 
 	chain1->SetBranchAddress("time",&time);
@@ -94,53 +100,63 @@ void Prueba(){
 	TH1F *adcDia1 = new TH1F("adcDia1","ADC Diamond 1",541,-270.5,270.5);
 	TH1F *adcDia2 = new TH1F("adcDia2","ADC Diamond 2",541,-270.5,270.5);
 	TH1F *adcSi = new TH1F("adcSi","ADC Si",541,-270.5,270.5);
-	avADCDia1->GetZaxis()->SetRangeUser(0,200);
-	avADCDia2->GetZaxis()->SetRangeUser(0,200);
-	avADCSi->GetZaxis()->SetRangeUser(0,200);
-	avADCDia1->SetContour(100);
-	avADCDia2->SetContour(100);
-	avADCSi->SetContour(100);
+	avADCDia1->SetContour(256);
+	avADCDia2->SetContour(256);
+	avADCSi->SetContour(256);
 	Double_t tempADC = 0;
+	hitPlane0->SetContour(256);
+	hitPlane1->SetContour(256);
+	hitPlane2->SetContour(256);
+	hitPlane3->SetContour(256);
+	hitPlane4->SetContour(256);
+	hitPlane5->SetContour(256);
+	hitPlane6->SetContour(256);
 
-	vector<char> columnas, filas, planos, adeces, cargas;
+	TH1F *colP3 = new TH1F("colP3","colP3",61,-0.5,60.5);
+	TH1F *rowP3 = new TH1F("rowP3","rowP3",91,-0.5,90.5);
+
+	vector<int> columnas, filas, planos, adeces, cargas;
 
 	for(Long64_t i = 0; i < numEntries; i++){
 		chain1->GetEntry(i);
-		numPlane = (Char_t)plane->size();
-		numCol = (Char_t)col->size();
-		numRow = (Char_t)row->size();
-		numADC = (Char_t)adc->size();
-		numCharge = (Char_t)charge->size();
+		numPlane = plane->size();
+		numCol = col->size();
+		numRow = row->size();
+		numADC = adc->size();
+		numCharge = charge->size();
+
 		if(numPlane & numCol & numRow & numADC == numCharge){
-			for(Char_t j = 0; j < numPlane; j++){
-				if(plane->at((Int_t)j)==0){
-					hitPlane0->Fill(col->at((Int_t)j),row->at((Int_t)j));
+			for(Int_t j = 0; j < numPlane; j++){
+				colP3->Fill(col->at(j));
+				rowP3->Fill(row->at(j));
+				if(plane->at(j)==0){
+					hitPlane0->Fill(col->at(j),row->at(j));
 				}
-				else if(plane->at((Int_t)j) == 1){
-					hitPlane1->Fill(col->at((Int_t)j),row->at((Int_t)j));
+				else if(plane->at(j) == 1){
+					hitPlane1->Fill(col->at(j),row->at(j));
 				}
-				else if(plane->at((Int_t)j) == 2){
-					hitPlane2->Fill(col->at((Int_t)j),row->at((Int_t)j));
+				else if(plane->at(j) == 2){
+					hitPlane2->Fill(col->at(j),row->at(j));
 				}
-				else if(plane->at((Int_t)j) == 3){
-					hitPlane3->Fill(col->at((Int_t)j),row->at((Int_t)j));
+				else if(plane->at(j) == 3){
+					hitPlane3->Fill(col->at(j),row->at(j));
 				}
-				else if(plane->at((Int_t)j) == 4){
-					hitPlane4->Fill(col->at((Int_t)j),row->at((Int_t)j));
-					tempADC = (Double_t)avADCDia1->GetBinContent(col->at((Int_t)j),row->at((Int_t)j))+adc->at((Int_t)j);
-					avADCDia1->SetBinContent(col->at((Int_t)j),row->at((Int_t)j),tempADC);
+				else if(plane->at(j) == 4){
+					hitPlane4->Fill(col->at(j),row->at(j));
+					tempADC = (Double_t)avADCDia1->GetBinContent(col->at(j)+1,row->at(j)+1)+adc->at(j);
+					avADCDia1->SetBinContent(col->at(j)+1,row->at(j)+1,tempADC);
 					adcDia1->Fill(adc->at(j));
 				}
-				else if(plane->at((Int_t)j) == 5){
-					hitPlane5->Fill(col->at((Int_t)j),row->at((Int_t)j));
-					tempADC = (Double_t)avADCDia2->GetBinContent(col->at((Int_t)j),row->at((Int_t)j))+adc->at((Int_t)j);
-					avADCDia2->SetBinContent(col->at((Int_t)j),row->at((Int_t)j),tempADC);
+				else if(plane->at(j) == 5){
+					hitPlane5->Fill(col->at(j),row->at(j));
+					tempADC = (Double_t)avADCDia2->GetBinContent(col->at(j)+1,row->at(j)+1)+adc->at(j);
+					avADCDia2->SetBinContent(col->at(j)+1,row->at(j)+1,tempADC);
 					adcDia2->Fill(adc->at(j));
 				}
-				else if(plane->at((Int_t)j) == 6){
-					hitPlane6->Fill(col->at((Int_t)j),row->at((Int_t)j));
-					tempADC = (Double_t)avADCSi->GetBinContent(col->at(j),row->at(j))+adc->at(j);
-					avADCSi->SetBinContent(col->at(j),row->at(j),tempADC);
+				else if(plane->at(j) == 6){
+					hitPlane6->Fill(col->at(j),row->at(j));
+					tempADC = (Double_t)avADCSi->GetBinContent(col->at(j)+1,row->at(j)+1)+adc->at(j);
+					avADCSi->SetBinContent(col->at(j)+1,row->at(j)+1,tempADC);
 					adcSi->Fill(adc->at(j));
 				}
 				else{
@@ -150,75 +166,75 @@ void Prueba(){
 			}
 		}
 	}
-	for(Int_t i = 1; i <= 52; i++){
-		for(Int_t j = 1; j <= 80; j++){
-			if(hitPlane4->GetBinContent(i,j) > 0.1){
-				tempADC = (Double_t)(avADCDia1->GetBinContent(i,j)/(Double_t)hitPlane4->GetBinContent(i,j));
-				avADCDia1->SetBinContent(i,j,tempADC);
+	for(Int_t ii = 1; ii <= 52; ii++){
+		for(Int_t jj = 1; jj <= 80; jj++){
+			if(hitPlane4->GetBinContent(ii,jj) >= 1){
+				tempADC = (Double_t)(avADCDia1->GetBinContent(ii,jj)/(Double_t)hitPlane4->GetBinContent(ii,jj));
+				avADCDia1->SetBinContent(ii,jj,tempADC);
 			}
-			if(hitPlane5->GetBinContent(i,j) > 0.1){
-				tempADC = (Double_t)(avADCDia2->GetBinContent(i,j)/(Double_t)hitPlane5->GetBinContent(i,j));
-				avADCDia2->SetBinContent(i,j,tempADC);
+			if(hitPlane5->GetBinContent(ii,jj) >= 1){
+				tempADC = (Double_t)(avADCDia2->GetBinContent(ii,jj)/(Double_t)hitPlane5->GetBinContent(ii,jj));
+				avADCDia2->SetBinContent(ii,jj,tempADC);
 			}
-			if(hitPlane6->GetBinContent(i,j) > 0.1){
-				tempADC = (Double_t)(avADCSi->GetBinContent(i,j)/(Double_t)hitPlane6->GetBinContent(i,j));
-				avADCSi->SetBinContent(i,j,tempADC);
+			if(hitPlane6->GetBinContent(ii,jj) >= 1){
+				tempADC = (Double_t)(avADCSi->GetBinContent(ii,jj)/(Double_t)hitPlane6->GetBinContent(ii,jj));
+				avADCSi->SetBinContent(ii,jj,tempADC);
 			}
 		}
 	}
 	TCanvas *c1 = new TCanvas("c1","Hit map Plane 0",1);
 	c1->cd();
 	hitPlane0->Draw("colz");
-	c1->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/Plane0.png");
+	c1->SaveAs(Form("%sPlane0.png",outputPath));
 	TCanvas *c2 = new TCanvas("c2","Hit map Plane 1",1);
 	c2->cd();
 	hitPlane1->Draw("colz");
-	c2->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/Plane1.png");
+	c2->SaveAs(Form("%sPlane1.png",outputPath));
 	TCanvas *c3 = new TCanvas("c3","Hit map Plane 2",1);
 	c3->cd();
 	hitPlane2->Draw("colz");
-	c3->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/Plane2.png");
+	c3->SaveAs(Form("%sPlane2.png",outputPath));
 	TCanvas *c4 = new TCanvas("c4","Hit map Plane 3",1);
 	c4->cd();
 	hitPlane3->Draw("colz");
-	c4->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/Plane3.png");
+	c4->SaveAs(Form("%sPlane3.png",outputPath));
 	TCanvas *c5 = new TCanvas("c5","Hit map Plane 4",1);
 	c5->cd();
 	hitPlane4->Draw("colz");
-	c5->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/Plane4.png");
+	c5->SaveAs(Form("%sPlane4.png",outputPath));
 	TCanvas *c6 = new TCanvas("c6","Hit map Plane 5",1);
 	c6->cd();
 	hitPlane5->Draw("colz");
-	c6->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/Plane5.png");
+	c6->SaveAs(Form("%sPlane5.png",outputPath));
 	TCanvas *c7 = new TCanvas("c7","Hit map Plane 6",1);
 	c7->cd();
 	hitPlane6->Draw("colz");
-	c7->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/Plane6.png");
+	c7->SaveAs(Form("%sPlane6.png",outputPath));
 	TCanvas *c8 = new TCanvas("c8","ADC Average Diamond 1",1);
 	c8->cd();
 	avADCDia1->Draw("colz");
-	c8->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/AvADCD1.png");
+	c8->SaveAs(Form("%sAvADCD1.png",outputPath));
 	TCanvas *c9 = new TCanvas("c9","ADC Average Diamond 2",1);
 	c9->cd();
 	avADCDia2->Draw("colz");
-	c9->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/AvADCD2.png");
+	c9->SaveAs(Form("%sAvADCD2.png",outputPath));
 	TCanvas *c12 = new TCanvas("c12","ADC Average Si",1);
 	c12->cd();
 	avADCSi->Draw("colz");
-	c12->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/AvADCSi.png");
+	c12->SaveAs(Form("%sAvADCSi.png",outputPath));
 	TCanvas *c10 = new TCanvas("c10","ADC Diamond 1",1);
 	c10->cd();
 	c10->SetLogy();
 	adcDia1->Draw();
-	c10->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/ADCD1.png");
+	c10->SaveAs(Form("%sADCD1.png",outputPath));
 	TCanvas *c11 = new TCanvas("c11","ADC Diamond 2",1);
 	c11->cd();
 	c11->SetLogy();
 	adcDia1->Draw();
-	c11->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/ADCD2.png");
+	c11->SaveAs(Form("%sADCD2.png",outputPath));
 	TCanvas *c13 = new TCanvas("c13","ADC Si",1);
 	c13->cd();
 	c13->SetLogy();
 	adcSi->Draw();
-	c13->SaveAs("~/Dropbox/201601/DiamondPixels/ReadPixelTree/ADCSi.png");
+	c13->SaveAs(Form("%sADCSi.png",outputPath));
 }
