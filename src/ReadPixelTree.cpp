@@ -36,6 +36,8 @@ void Prueba(char *rootFilePath, char *outputPath);
 
 TChain * ReadPixRootFile(const char *fileName);
 
+void PhHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *clust_ROC_X, vector<float> *clust_ROC_Y, TH1F *phDUT, TH2F *avPHDUT, TH2F *hitMapPHDUT);
+
 const char *rootFilePathComplete = "~/Data/psi_2015_10/root/pixel/test151000312_withTracks.root";
 const char *rootFilePathSmall = "~/DataSmall/psi_2015_10/root/pixel/TrackedRun312.root";
 
@@ -147,22 +149,16 @@ void Prueba(char *rootFilePath,char *outputPath){
 	TH1F *adcDia2 = new TH1F("adcDia2","ADC Diamond 2",541,-270.5,270.5);
 	TH1F *adcSi = new TH1F("adcSi","ADC Si",541,-270.5,270.5);
 
-	TH2F *avPHDia1Res1 = new TH2F("avPHDia1Res1","Average PH Diamond 1 R1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *avPHDia1Res2 = new TH2F("avPHDia1Res2","Average PH Diamond 1 R2",divXR2,xminR2,xmaxR2,divYR2,yminR2,ymaxR2);
+	TH2F *avPHDia1 = new TH2F("avPHDia1","Average PH Diamond 1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 	TH1F *phDia1 = new TH1F("phDia1","Pulse Height Diamond 1",501,-250,250250);
-	TH2F *avPHDia2Res1 = new TH2F("avPHDia2Res1","Average PH Diamond 2 R1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *avPHDia2Res2 = new TH2F("avPHDia2Res2","Average PH Diamond 2 R2",divXR2,xminR2,xmaxR2,divYR2,yminR2,ymaxR2);
+	TH2F *avPHDia2 = new TH2F("avPHDia2","Average PH Diamond 2",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 	TH1F *phDia2 = new TH1F("phDia2","Pulse Height Diamond 2",501,-2052,50052);
-	TH2F *avPHSiRes1 = new TH2F("avPHSiRes1","Average PH Silicon R1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *avPHSiRes2 = new TH2F("avPHSiRes2","Average PH Silicon R2",divXR2,xminR2,xmaxR2,divYR2,yminR2,ymaxR2);
+	TH2F *avPHSi = new TH2F("avPHSi","Average PH Silicon",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 	TH1F *phSi = new TH1F("phSi","Pulse Height Silicon",501,-10210,200210);
 
-	TH2F *hitMapPHDia1Res1 = new TH2F("hitMapPHDia1Res1","Hit Map Diamond 1 for PH R1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *hitMapPHDia1Res2 = new TH2F("hitMapPHDia1Res2","Hit Map Diamond 1 for PH R2",divXR2,xminR2,xmaxR2,divYR2,yminR2,ymaxR2);
-	TH2F *hitMapPHDia2Res1 = new TH2F("hitMapPHDia2Res1","Hit Map Diamond 2 for PH R1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *hitMapPHDia2Res2 = new TH2F("hitMapPHDia2Res2","Hit Map Diamond 2 for PH R2",divXR2,xminR2,xmaxR2,divYR2,yminR2,ymaxR2);
-	TH2F *hitMapPHSiRes1 = new TH2F("hitMapPHSiRes1","Hit Map Si for PH R1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *hitMapPHSiRes2 = new TH2F("hitMapPHSiRes2","Hit Map Si for PH R2",divXR2,xminR2,xmaxR2,divYR2,yminR2,ymaxR2);
+	TH2F *hitMapPHDia1 = new TH2F("hitMapPHDia1","Hit Map Diamond 1 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH2F *hitMapPHDia2 = new TH2F("hitMapPHDia2","Hit Map Diamond 2 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH2F *hitMapPHSi = new TH2F("hitMapPHSi","Hit Map Si for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 
 
 	avADCDia1->SetContour(contour2D);
@@ -179,12 +175,9 @@ void Prueba(char *rootFilePath,char *outputPath){
 
 	Double_t tempPH = 0;
 	Int_t tempBinX = 0, tempBinY = 0;
-	avPHDia1Res1->SetContour(contour2D);
-	avPHDia1Res2->SetContour(contour2D);
-	avPHDia2Res1->SetContour(contour2D);
-	avPHDia2Res2->SetContour(contour2D);
-	avPHSiRes1->SetContour(contour2D);
-	avPHSiRes2->SetContour(contour2D);
+	avPHDia1->SetContour(contour2D);
+	avPHDia2->SetContour(contour2D);
+	avPHSi->SetContour(contour2D);
 
 	TH1F *colP3 = new TH1F("colP3","colP3",61,-0.5,60.5);
 	TH1F *rowP3 = new TH1F("rowP3","rowP3",91,-0.5,90.5);
@@ -242,81 +235,11 @@ void Prueba(char *rootFilePath,char *outputPath){
 			numCLROC[i] = (Int_t)clust_per_plane->at(i);
 		}
 		// For Diamond 1
-		if(numCLROC[4] != 0){
-			for(Int_t i = 0; i < numPhR4_1cl; i++){
-				// For resolution 1
-				if(clust_ROC4_X->size() >= numPhR4_1cl && clust_ROC4_Y->size() >= numPhR4_1cl){
-					tempBinX = (Int_t)(TMath::Ceil((Float_t)((clust_ROC4_X->at(i)*10-xminR1)/deltaXR1)));
-					tempBinY = (Int_t)(TMath::Ceil((Float_t)((clust_ROC4_Y->at(i)*10-yminR1)/deltaYR1)));
-					phDia1->Fill(ph_ROC4_1cl->at(i));
-					if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR1 && tempBinY <= divYR1){
-						tempPH = (Double_t)(avPHDia1Res1->GetBinContent(tempBinX,tempBinY)+ph_ROC4_1cl->at(i));
-						avPHDia1Res1->SetBinContent(tempBinX,tempBinY,tempPH);
-						hitMapPHDia1Res1->Fill(tempBinX,tempBinY);
-					}
-					// For resolution 2
-					tempBinX = (Int_t)(TMath::Ceil((Float_t)((clust_ROC4_X->at(i)*10-xminR2)/deltaXR2)));
-					tempBinY = (Int_t)(TMath::Ceil((Float_t)((clust_ROC4_Y->at(i)*10-yminR2)/deltaYR2)));
-					if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR2 && tempBinY <= divYR2){
-						tempPH = (Double_t)(avPHDia1Res2->GetBinContent(tempBinX,tempBinY)+ph_ROC4_1cl->at(i));
-						avPHDia1Res2->SetBinContent(tempBinX,tempBinY,tempPH);
-						hitMapPHDia1Res2->Fill(tempBinX,tempBinY);
-					}
-				}
-			}
-
-		}
+		PhHistogramExtraction(numCLROC[4], ph_ROC4_1cl, clust_ROC4_X, clust_ROC4_Y, phDia1, avPHDia1, hitMapPHDia1);
 		// For Diamond 2
-		if(numCLROC[5] != 0){
-			numPhR5_1cl = ph_ROC5_1cl->size();
-			for(Int_t i = 0; i < numPhR5_1cl; i++){
-				// For resolution 1
-				if(clust_ROC5_X->size() >= numPhR5_1cl && clust_ROC5_Y->size() >= numPhR5_1cl){
-					tempBinX = (Int_t)(TMath::Ceil((Float_t)((clust_ROC5_X->at(i)*10-xminR1)/deltaXR1)));
-					tempBinY = (Int_t)(TMath::Ceil((Float_t)((clust_ROC5_Y->at(i)*10-yminR1)/deltaYR1)));
-					phDia2->Fill(ph_ROC5_1cl->at(i));
-					if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR1 && tempBinY <= divYR1){
-						tempPH = (Double_t)(avPHDia2Res1->GetBinContent(tempBinX,tempBinY)+ph_ROC5_1cl->at(i));
-						avPHDia2Res1->SetBinContent(tempBinX,tempBinY,tempPH);
-						hitMapPHDia2Res1->Fill(tempBinX,tempBinY);
-					}
-					// For resolution 2
-					tempBinX = (Int_t)(TMath::Ceil((Float_t)((clust_ROC5_X->at(i)*10-xminR2)/deltaXR2)));
-					tempBinY = (Int_t)(TMath::Ceil((Float_t)((clust_ROC5_Y->at(i)*10-yminR2)/deltaYR2)));
-					if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR2 && tempBinY <= divYR2){
-						tempPH = (Double_t)(avPHDia2Res2->GetBinContent(tempBinX,tempBinY)+ph_ROC5_1cl->at(i));
-						avPHDia2Res2->SetBinContent(tempBinX,tempBinY,tempPH);
-						hitMapPHDia2Res2->Fill(tempBinX,tempBinY);
-					}
-				}
-			}
-
-		}
+		PhHistogramExtraction(numCLROC[5], ph_ROC5_1cl, clust_ROC5_X, clust_ROC5_Y, phDia2, avPHDia2, hitMapPHDia2);
 		// For Silicon
-		if(numCLROC[6] != 0){
-			numPhR6_1cl = ph_ROC6_1cl->size();
-			for(Int_t i = 0; i < numPhR6_1cl; i++){
-				// For resolution 1
-				if(clust_ROC6_X->size() >= numPhR6_1cl && clust_ROC6_Y->size() >= numPhR6_1cl){
-					tempBinX = (Int_t)(TMath::Ceil((Float_t)((clust_ROC6_X->at(i)*10-xminR1)/deltaXR1)));
-					tempBinY = (Int_t)(TMath::Ceil((Float_t)((clust_ROC6_Y->at(i)*10-yminR1)/deltaYR1)));
-					phSi->Fill(ph_ROC6_1cl->at(i));
-					if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR1 && tempBinY <= divYR1){
-						tempPH = (Double_t)(avPHSiRes1->GetBinContent(tempBinX,tempBinY)+ph_ROC6_1cl->at(i));
-						avPHSiRes1->SetBinContent(tempBinX,tempBinY,tempPH);
-						hitMapPHSiRes1->Fill(tempBinX,tempBinY);
-					}
-					// For resolution 2
-					tempBinX = (Int_t)(TMath::Ceil((Float_t)((clust_ROC6_X->at(i)*10-xminR2)/deltaXR2)));
-					tempBinY = (Int_t)(TMath::Ceil((Float_t)((clust_ROC6_Y->at(i)*10-yminR2)/deltaYR2)));
-					if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR2 && tempBinY <= divYR2){
-						tempPH = (Double_t)(avPHSiRes2->GetBinContent(tempBinX,tempBinY)+ph_ROC6_1cl->at(i));
-						avPHSiRes2->SetBinContent(tempBinX,tempBinY,tempPH);
-						hitMapPHSiRes2->Fill(tempBinX,tempBinY);
-					}
-				}
-			}
-		}
+		PhHistogramExtraction(numCLROC[6], ph_ROC6_1cl, clust_ROC6_X, clust_ROC6_Y, phSi, avPHSi, hitMapPHSi);
 	}
 
 	// average for ADC
@@ -341,34 +264,17 @@ void Prueba(char *rootFilePath,char *outputPath){
 	// Res1
 	for(Int_t i = 1; i <= divXR1; i++){
 		for(Int_t j = 1; j <= divYR1; j++){
-			if(hitMapPHDia1Res1->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHDia1Res1->GetBinContent(i,j)/(Double_t)hitMapPHDia1Res1->GetBinContent(i,j));
-				avPHDia1Res1->SetBinContent(i,j,tempPH);
+			if(hitMapPHDia1->GetBinContent(i,j) >= 1){
+				tempPH = (Double_t)(avPHDia1->GetBinContent(i,j)/(Double_t)hitMapPHDia1->GetBinContent(i,j));
+				avPHDia1->SetBinContent(i,j,tempPH);
 			}
-			if(hitMapPHDia2Res1->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHDia2Res1->GetBinContent(i,j)/(Double_t)hitMapPHDia2Res1->GetBinContent(i,j));
-				avPHDia2Res1->SetBinContent(i,j,tempPH);
+			if(hitMapPHDia2->GetBinContent(i,j) >= 1){
+				tempPH = (Double_t)(avPHDia2->GetBinContent(i,j)/(Double_t)hitMapPHDia2->GetBinContent(i,j));
+				avPHDia2->SetBinContent(i,j,tempPH);
 			}
-			if(hitMapPHSiRes1->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHSiRes1->GetBinContent(i,j)/(Double_t)hitMapPHSiRes1->GetBinContent(i,j));
-				avPHSiRes1->SetBinContent(i,j,tempPH);
-			}
-		}
-	}
-	// Res2
-	for(Int_t i = 1; i <= divXR2; i++){
-		for(Int_t j = 1; j <= divYR2; j++){
-			if(hitMapPHDia1Res2->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHDia1Res2->GetBinContent(i,j)/(Double_t)hitMapPHDia1Res2->GetBinContent(i,j));
-				avPHDia1Res2->SetBinContent(i,j,tempPH);
-			}
-			if(hitMapPHDia2Res2->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHDia2Res2->GetBinContent(i,j)/(Double_t)hitMapPHDia2Res2->GetBinContent(i,j));
-				avPHDia2Res2->SetBinContent(i,j,tempPH);
-			}
-			if(hitMapPHSiRes2->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHSiRes2->GetBinContent(i,j)/(Double_t)hitMapPHSiRes2->GetBinContent(i,j));
-				avPHSiRes2->SetBinContent(i,j,tempPH);
+			if(hitMapPHSi->GetBinContent(i,j) >= 1){
+				tempPH = (Double_t)(avPHSi->GetBinContent(i,j)/(Double_t)hitMapPHSi->GetBinContent(i,j));
+				avPHSi->SetBinContent(i,j,tempPH);
 			}
 		}
 	}
@@ -430,28 +336,16 @@ void Prueba(char *rootFilePath,char *outputPath){
 	c13->SaveAs(Form("%sADCSi.png",outputPath));
 	TCanvas *c14 = new TCanvas("c14","PH Average Diamond 1 R1",1);
 	c14->cd();
-	avPHDia1Res1->Draw("colz");
+	avPHDia1->Draw("colz");
 	c14->SaveAs(Form("%sAvPHD1R1.png",outputPath));
-	TCanvas *c15 = new TCanvas("c15","PH Average Diamond 1 R2",1);
-	c15->cd();
-	avPHDia1Res2->Draw("colz");
-	c15->SaveAs(Form("%sAvPHD1R2.png",outputPath));
 	TCanvas *c16 = new TCanvas("c16","PH Average Diamond 2 R1",1);
 	c16->cd();
-	avPHDia2Res1->Draw("colz");
+	avPHDia2->Draw("colz");
 	c16->SaveAs(Form("%sAvPHD2R1.png",outputPath));
-	TCanvas *c17 = new TCanvas("c17","PH Average Diamond 2 R2",1);
-	c17->cd();
-	avPHDia2Res2->Draw("colz");
-	c17->SaveAs(Form("%sAvPHD2R2.png",outputPath));
 	TCanvas *c18 = new TCanvas("c18","PH Average Silicon R1",1);
 	c18->cd();
-	avPHSiRes1->Draw("colz");
+	avPHSi->Draw("colz");
 	c18->SaveAs(Form("%sAvPHSiR1.png",outputPath));
-	TCanvas *c19 = new TCanvas("c19","PH Average Silicon R2",1);
-	c19->cd();
-	avPHSiRes2->Draw("colz");
-	c19->SaveAs(Form("%sAvPHSiR2.png",outputPath));
 	TCanvas *c20 = new TCanvas("c20","PH Diamond 1",1);
 	c20->cd();
 	c20->SetLogy();
@@ -467,4 +361,24 @@ void Prueba(char *rootFilePath,char *outputPath){
 	c22->SetLogy();
 	phSi->Draw("B E1");
 	c22->SaveAs(Form("%sPHSi.png",outputPath));
+}
+
+void PhHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *clust_ROC_X, vector<float> *clust_ROC_Y, TH1F *phDUT, TH2F *avPHDUT, TH2F *hitMapPHDUT){
+	if(numCLROC != 0){
+		int numPhROC = phROC->size();
+		Int_t tempBinX = 0, tempBinY = 0;
+		Double_t tempPH = 0;
+		for(Int_t i = 0; i < numPhROC; i++){
+			if(clust_ROC_X->size() >= numPhROC && clust_ROC_Y->size() >= numPhROC){
+				tempBinX = (Int_t)(TMath::Ceil((Float_t)((clust_ROC_X->at(i)*10-xminR1)/deltaXR1)));
+				tempBinY = (Int_t)(TMath::Ceil((Float_t)((clust_ROC_Y->at(i)*10-yminR1)/deltaYR1)));
+				phDUT->Fill(phROC->at(i));
+				if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR1 && tempBinY <= divYR1){
+					tempPH = (Double_t)(avPHDUT->GetBinContent(tempBinX,tempBinY)+phROC->at(i));
+					avPHDUT->SetBinContent(tempBinX,tempBinY,tempPH);
+					hitMapPHDUT->Fill(tempBinX,tempBinY);
+				}
+			}
+		}
+	}
 }
