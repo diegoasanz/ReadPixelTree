@@ -46,7 +46,7 @@ void FindAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histT
 
 void AverageBinHistogram(TH2F *histToAv, TH2F *histHits, Int_t binx, Int_t biny);
 
-const char *rootFilePathComplete = "~/Data/psi_2015_10/root/pixel/test151000312_withTracks.root";
+const char *rootFilePathComplete = "~/Data/psi_2015_10/root/pixel/TrackedRun312.root";
 const char *rootFilePathSmall = "~/DataSmall/psi_2015_10/root/pixel/TrackedRun312.root";
 
 const char *outputPathComplete = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/";
@@ -63,8 +63,8 @@ int main() {
 	gROOT->ProcessLine("#include <vector>");
 	gSystem->Load("libMathCore");
 	gSystem->Load("libPhysics");
-	const char *rootFilePath = rootFilePathSmall;
-	const char *outputPath = outputPathSmall;
+	const char *rootFilePath = rootFilePathComplete;
+	const char *outputPath = outputPathComplete;
 	Prueba((char *)rootFilePath, (char *)outputPath);
 	return 0;
 }
