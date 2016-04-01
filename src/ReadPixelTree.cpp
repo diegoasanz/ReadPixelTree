@@ -38,16 +38,26 @@ TChain * ReadPixRootFile(const char *fileName);
 
 void PhHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *clust_ROC_X, vector<float> *clust_ROC_Y, TH1F *phDUT, TH2F *avPHDUT, TH2F *hitMapPHDUT);
 
+void PlotHistogram1D(TH1F *histogram, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix);
+
+void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath, const char *suffix);
+
+void FindAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histToAvDUT2, TH2F *histHitsDUT2, TH2F *histToAvDUT3, TH2F *histHitsDUT3, Int_t xbins, Int_t ybins);
+
+void AverageBinHistogram(TH2F *histToAv, TH2F *histHits, Int_t binx, Int_t biny);
+
 const char *rootFilePathComplete = "~/Data/psi_2015_10/root/pixel/test151000312_withTracks.root";
 const char *rootFilePathSmall = "~/DataSmall/psi_2015_10/root/pixel/TrackedRun312.root";
 
 const char *outputPathComplete = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/";
 const char *outputPathSmall = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/Small/";
 
-Int_t contour2D = 256;
-Float_t xminR1 = -6.075, xminR2 = -6.0415, xmaxR1 = 6.075, xmaxR2 = 6.0415, yminR1 = -6.05, yminR2 = -6.0175, ymaxR1 = 6.05, ymaxR2 = 6.0175;
-Int_t divXR1 = 81, divXR2 = 281, divYR1 = 121, divYR2 = 415;
-Float_t deltaXR1 = (Float_t)((xmaxR1-xminR1)/divXR1), deltaXR2 = (Float_t)((xmaxR2-xminR2)/divXR2), deltaYR1 = (Float_t)((ymaxR1-yminR1)/divYR1), deltaYR2 = (Float_t)((ymaxR2-yminR2)/divYR2);
+const char *histogramOutputFile = "Histograms.root";
+
+Int_t contour2D = 1024;
+Float_t xminR1 = -6.075, xmaxR1 = 6.075, yminR1 = -6.05, ymaxR1 = 6.05;
+Int_t divXR1 = 81, divYR1 = 121;
+Float_t deltaXR1 = (Float_t)((xmaxR1-xminR1)/divXR1), deltaYR1 = (Float_t)((ymaxR1-yminR1)/divYR1);
 
 int main() {
 	gROOT->ProcessLine("#include <vector>");
@@ -69,15 +79,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 	//Create Chain to read tree
 	TChain *chain1 = ReadPixRootFile(rootFilePath);
 	//Make pointers to branches
-	TBranch *braTime = chain1->GetBranch("time");
 	TBranch *braPlane = chain1->GetBranch("plane");
-	TBranch *braCol = chain1->GetBranch("col");
-	TBranch *braRow = chain1->GetBranch("row");
-	TBranch *braADC = chain1->GetBranch("adc");
-	TBranch *braDia1X = chain1->GetBranch("diam1_track_x");
-	TBranch *braDia1Y = chain1->GetBranch("diam1_track_y");
-	TBranch *braDia2X = chain1->GetBranch("diam2_track_x");
-	TBranch *braDia2Y = chain1->GetBranch("diam2_track_y");
 	//Create variables to read the tree
 	vector<int> *plane=0, *col=0, *row=0, *adc=0;
 	vector<unsigned char> *clust_per_plane=0;
@@ -85,13 +87,12 @@ void Prueba(char *rootFilePath,char *outputPath){
 	vector<float> *clust_ROC2_X = 0, *clust_ROC2_Y = 0, *ph_ROC2_1cl = 0, *clust_ROC3_X = 0, *clust_ROC3_Y = 0, *ph_ROC3_1cl = 0;
 	vector<float> *clust_ROC4_X = 0, *clust_ROC4_Y = 0, *ph_ROC4_1cl = 0, *clust_ROC5_X = 0, *clust_ROC5_Y = 0, *ph_ROC5_1cl = 0, *clust_ROC6_X = 0, *clust_ROC6_Y = 0, *ph_ROC6_1cl = 0;
 	Float_t time=0, dia1X=0, dia1Y=0, dia2X=0, dia2Y=0, chi2_tracks=0, chi2_x=0, chi2_y=0, slope_x=0, slope_y=0;
-	Long64_t event_number=0;
+	Int_t event_number=0;
 	//Int_t n_tracks = 0, n_cluster = 0;
 	//dimension variables
 	vector<int> numCLROC;
 	numCLROC.resize(7);
-	Int_t numPlane = 0, numCol = 0, numRow = 0, numADC = 0, numPhR0_1cl = 0, numCLR1X = 0, numCLR1Y = 0, numPhR1_1cl = 0, numCLR2X = 0, numCLR2Y = 0, numPhR2_1cl = 0;
-	Int_t numCLR3X = 0, numCLR3Y = 0, numPhR3_1cl = 0, numCLR4X = 0, numCLR4Y = 0, numPhR4_1cl = 0, numCLR5X = 0, numCLR5Y = 0, numPhR5_1cl = 0, numCLR6X = 0, numCLR6Y = 0, numPhR6_1cl = 0;
+	Int_t numPlane = 0, numCol = 0, numRow = 0, numADC = 0;
 	Long64_t numEntries = braPlane->GetEntries();
 
 	chain1->SetBranchAddress("event_number",&event_number);
@@ -134,7 +135,6 @@ void Prueba(char *rootFilePath,char *outputPath){
 	chain1->SetBranchAddress("cluster_pos_ROC6_Y",&clust_ROC6_Y);
 	chain1->SetBranchAddress("pulse_height_ROC6_1_cluster",&ph_ROC6_1cl);
 
-
 	TH2F *hitPlane0 = new TH2F("hitPlane0","Hit map Plane 0",52,-0.5,51.5,80,-0.5,79.5);
 	TH2F *hitPlane1 = new TH2F("hitPlane1","Hit map Plane 1",52,-0.5,51.5,80,-0.5,79.5);
 	TH2F *hitPlane2 = new TH2F("hitPlane2","Hit map Plane 2",52,-0.5,51.5,80,-0.5,79.5);
@@ -161,10 +161,10 @@ void Prueba(char *rootFilePath,char *outputPath){
 	TH2F *hitMapPHSi = new TH2F("hitMapPHSi","Hit Map Si for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 
 
+	Double_t tempADC = 0;
 	avADCDia1->SetContour(contour2D);
 	avADCDia2->SetContour(contour2D);
 	avADCSi->SetContour(contour2D);
-	Double_t tempADC = 0;
 	hitPlane0->SetContour(contour2D);
 	hitPlane1->SetContour(contour2D);
 	hitPlane2->SetContour(contour2D);
@@ -173,11 +173,24 @@ void Prueba(char *rootFilePath,char *outputPath){
 	hitPlane5->SetContour(contour2D);
 	hitPlane6->SetContour(contour2D);
 
-	Double_t tempPH = 0;
-	Int_t tempBinX = 0, tempBinY = 0;
 	avPHDia1->SetContour(contour2D);
 	avPHDia2->SetContour(contour2D);
 	avPHSi->SetContour(contour2D);
+
+	avADCDia1->SetMinimum(0);
+	avADCDia2->SetMinimum(0);
+	avADCSi->SetMinimum(0);
+	hitPlane0->SetMinimum(0);
+	hitPlane1->SetMinimum(0);
+	hitPlane2->SetMinimum(0);
+	hitPlane3->SetMinimum(0);
+	hitPlane4->SetMinimum(0);
+	hitPlane5->SetMinimum(0);
+	hitPlane6->SetMinimum(0);
+
+	avPHDia1->SetMinimum(0);
+	avPHDia2->SetMinimum(0);
+	avPHSi->SetMinimum(0);
 
 	TH1F *colP3 = new TH1F("colP3","colP3",61,-0.5,60.5);
 	TH1F *rowP3 = new TH1F("rowP3","rowP3",91,-0.5,90.5);
@@ -243,124 +256,61 @@ void Prueba(char *rootFilePath,char *outputPath){
 	}
 
 	// average for ADC
-	for(Int_t ii = 1; ii <= 52; ii++){
-		for(Int_t jj = 1; jj <= 80; jj++){
-			if(hitPlane4->GetBinContent(ii,jj) >= 1){
-				tempADC = (Double_t)(avADCDia1->GetBinContent(ii,jj)/(Double_t)hitPlane4->GetBinContent(ii,jj));
-				avADCDia1->SetBinContent(ii,jj,tempADC);
+	FindAverageHistogramDUT(avADCDia1, hitPlane4, avADCDia2, hitPlane5, avADCSi, hitPlane6, 52, 80);
 
-			}
-			if(hitPlane5->GetBinContent(ii,jj) >= 1){
-				tempADC = (Double_t)(avADCDia2->GetBinContent(ii,jj)/(Double_t)hitPlane5->GetBinContent(ii,jj));
-				avADCDia2->SetBinContent(ii,jj,tempADC);
-			}
-			if(hitPlane6->GetBinContent(ii,jj) >= 1){
-				tempADC = (Double_t)(avADCSi->GetBinContent(ii,jj)/(Double_t)hitPlane6->GetBinContent(ii,jj));
-				avADCSi->SetBinContent(ii,jj,tempADC);
-			}
-		}
-	}
 	// average for PH
-	// Res1
-	for(Int_t i = 1; i <= divXR1; i++){
-		for(Int_t j = 1; j <= divYR1; j++){
-			if(hitMapPHDia1->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHDia1->GetBinContent(i,j)/(Double_t)hitMapPHDia1->GetBinContent(i,j));
-				avPHDia1->SetBinContent(i,j,tempPH);
-			}
-			if(hitMapPHDia2->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHDia2->GetBinContent(i,j)/(Double_t)hitMapPHDia2->GetBinContent(i,j));
-				avPHDia2->SetBinContent(i,j,tempPH);
-			}
-			if(hitMapPHSi->GetBinContent(i,j) >= 1){
-				tempPH = (Double_t)(avPHSi->GetBinContent(i,j)/(Double_t)hitMapPHSi->GetBinContent(i,j));
-				avPHSi->SetBinContent(i,j,tempPH);
-			}
-		}
-	}
-	
-	TCanvas *c1 = new TCanvas("c1","Hit map Plane 0",1);
-	c1->cd();
-	hitPlane0->Draw("colz");
-	c1->SaveAs(Form("%sPlane0.png",outputPath));
-	TCanvas *c2 = new TCanvas("c2","Hit map Plane 1",1);
-	c2->cd();
-	hitPlane1->Draw("colz");
-	c2->SaveAs(Form("%sPlane1.png",outputPath));
-	TCanvas *c3 = new TCanvas("c3","Hit map Plane 2",1);
-	c3->cd();
-	hitPlane2->Draw("colz");
-	c3->SaveAs(Form("%sPlane2.png",outputPath));
-	TCanvas *c4 = new TCanvas("c4","Hit map Plane 3",1);
-	c4->cd();
-	hitPlane3->Draw("colz");
-	c4->SaveAs(Form("%sPlane3.png",outputPath));
-	TCanvas *c5 = new TCanvas("c5","Hit map Plane 4",1);
-	c5->cd();
-	hitPlane4->Draw("colz");
-	c5->SaveAs(Form("%sPlane4.png",outputPath));
-	TCanvas *c6 = new TCanvas("c6","Hit map Plane 5",1);
-	c6->cd();
-	hitPlane5->Draw("colz");
-	c6->SaveAs(Form("%sPlane5.png",outputPath));
-	TCanvas *c7 = new TCanvas("c7","Hit map Plane 6",1);
-	c7->cd();
-	hitPlane6->Draw("colz");
-	c7->SaveAs(Form("%sPlane6.png",outputPath));
-	TCanvas *c8 = new TCanvas("c8","ADC Average Diamond 1",1);
-	c8->cd();
-	avADCDia1->Draw("colz");
-	c8->SaveAs(Form("%sAvADCD1.png",outputPath));
-	TCanvas *c9 = new TCanvas("c9","ADC Average Diamond 2",1);
-	c9->cd();
-	avADCDia2->Draw("colz");
-	c9->SaveAs(Form("%sAvADCD2.png",outputPath));
-	TCanvas *c12 = new TCanvas("c12","ADC Average Si",1);
-	c12->cd();
-	avADCSi->Draw("colz");
-	c12->SaveAs(Form("%sAvADCSi.png",outputPath));
-	TCanvas *c10 = new TCanvas("c10","ADC Diamond 1",1);
-	c10->cd();
-	c10->SetLogy();
-	adcDia1->Draw();
-	c10->SaveAs(Form("%sADCD1.png",outputPath));
-	TCanvas *c11 = new TCanvas("c11","ADC Diamond 2",1);
-	c11->cd();
-	c11->SetLogy();
-	adcDia1->Draw();
-	c11->SaveAs(Form("%sADCD2.png",outputPath));
-	TCanvas *c13 = new TCanvas("c13","ADC Si",1);
-	c13->cd();
-	c13->SetLogy();
-	adcSi->Draw();
-	c13->SaveAs(Form("%sADCSi.png",outputPath));
-	TCanvas *c14 = new TCanvas("c14","PH Average Diamond 1 R1",1);
-	c14->cd();
-	avPHDia1->Draw("colz");
-	c14->SaveAs(Form("%sAvPHD1R1.png",outputPath));
-	TCanvas *c16 = new TCanvas("c16","PH Average Diamond 2 R1",1);
-	c16->cd();
-	avPHDia2->Draw("colz");
-	c16->SaveAs(Form("%sAvPHD2R1.png",outputPath));
-	TCanvas *c18 = new TCanvas("c18","PH Average Silicon R1",1);
-	c18->cd();
-	avPHSi->Draw("colz");
-	c18->SaveAs(Form("%sAvPHSiR1.png",outputPath));
-	TCanvas *c20 = new TCanvas("c20","PH Diamond 1",1);
-	c20->cd();
-	c20->SetLogy();
-	phDia1->Draw("B E1");
-	c20->SaveAs(Form("%sPHD1.png",outputPath));
-	TCanvas *c21 = new TCanvas("c21","PH Diamond 2",1);
-	c21->cd();
-	c21->SetLogy();
-	phDia2->Draw("B E1");
-	c21->SaveAs(Form("%sPHD2.png",outputPath));
-	TCanvas *c22 = new TCanvas("c22","PH Silicon",1);
-	c22->cd();
-	c22->SetLogy();
-	phSi->Draw("B E1");
-	c22->SaveAs(Form("%sPHSi.png",outputPath));
+	FindAverageHistogramDUT(avPHDia1,hitMapPHDia1,avPHDia2,hitMapPHDia2,avPHSi,hitMapPHSi,divXR1,divYR1);
+
+	// Plot histograms
+	PlotHistogram2D(hitPlane0,"Hit map Plane 0",outputPath,"HitMapPlane0.png");
+	PlotHistogram2D(hitPlane1,"Hit map Plane 1",outputPath,"HitMapPlane1.png");
+	PlotHistogram2D(hitPlane2,"Hit map Plane 2",outputPath,"HitMapPlane2.png");
+	PlotHistogram2D(hitPlane3,"Hit map Plane 3",outputPath,"HitMapPlane3.png");
+	PlotHistogram2D(hitPlane4,"Hit map Plane 4",outputPath,"HitMapPlane4.png");
+	PlotHistogram2D(hitPlane5,"Hit map Plane 5",outputPath,"HitMapPlane5.png");
+	PlotHistogram2D(hitPlane6,"Hit map Plane 6",outputPath,"HitMapPlane6.png");
+
+	PlotHistogram2D(avADCDia1,"ADC Average Diamond 1",outputPath,"AvADCD1.png");
+	PlotHistogram2D(avADCDia2,"ADC Average Diamond 2",outputPath,"AvADCD2.png");
+	PlotHistogram2D(avADCSi,"ADC Average Silicon",outputPath,"AvADCSi.png");
+
+	PlotHistogram1D(adcDia1, kTRUE, kFALSE, "ADC Diamond 1", outputPath, "ADCD1.png");
+	PlotHistogram1D(adcDia2, kTRUE, kFALSE, "ADC Diamond 2", outputPath, "ADCD2.png");
+	PlotHistogram1D(adcSi, kTRUE, kFALSE, "ADC Silicon", outputPath, "ADCSi.png");
+
+	PlotHistogram2D(avPHDia1,"PH Average Diamond 1",outputPath,"AvPHD1.png");
+	PlotHistogram2D(avPHDia2,"PH Average Diamond 2",outputPath,"AvPHD2.png");
+	PlotHistogram2D(avPHSi,"PH Average Silicon",outputPath,"AvPHSi.png");
+
+	PlotHistogram1D(phDia1, kTRUE, kFALSE, "PH Diamond 1", outputPath, "PHD1.png");
+	PlotHistogram1D(phDia2, kTRUE, kFALSE, "PH Diamond 2", outputPath, "PHD2.png");
+	PlotHistogram1D(phSi, kTRUE, kFALSE, "PH Silicon", outputPath, "PHSi.png");
+
+	// Save histograms
+	TFile f(Form("%s%s",outputPath,histogramOutputFile),"RECREATE");
+	adcDia1->Write();
+	adcDia2->Write();
+	adcSi->Write();
+	phDia1->Write();
+	phDia2->Write();
+	phSi->Write();
+	hitPlane0->Write();
+	hitPlane1->Write();
+	hitPlane2->Write();
+	hitPlane3->Write();
+	hitPlane4->Write();
+	hitPlane5->Write();
+	hitPlane6->Write();
+	avADCDia1->Write();
+	avADCDia2->Write();
+	avADCSi->Write();
+	avPHDia1->Write();
+	avPHDia2->Write();
+	avPHSi->Write();
+
+	f.Close();
+
+
 }
 
 void PhHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *clust_ROC_X, vector<float> *clust_ROC_Y, TH1F *phDUT, TH2F *avPHDUT, TH2F *hitMapPHDUT){
@@ -381,4 +331,45 @@ void PhHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *cl
 			}
 		}
 	}
+}
+
+void PlotHistogram1D(TH1F *histogram, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix){
+	TCanvas *c1 = new TCanvas("c1",title,1);
+	c1->cd();
+	if(logX)
+		c1->SetLogx();
+	if(logY)
+		c1->SetLogy();
+	histogram->Draw("E1 SAME HIST");
+	c1->SaveAs(Form("%s%s",outputPath,suffix));
+	delete c1;
+}
+
+void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath, const char *suffix){
+	TCanvas *c1 = new TCanvas("c1",title,1);
+	c1->cd();
+	histogram->Draw("COLZ");
+	c1->SaveAs(Form("%s%s",outputPath,suffix));
+	delete c1;
+}
+
+void FindAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histToAvDUT2, TH2F *histHitsDUT2, TH2F *histToAvDUT3, TH2F *histHitsDUT3, Int_t xbins, Int_t ybins){
+	for (Int_t i = 1; i <= xbins; i++){
+		for (Int_t j = 1; j <= ybins; j++){
+			if(histHitsDUT1->GetBinContent(i,j) >= 1){
+				AverageBinHistogram(histToAvDUT1,histHitsDUT1,i,j);
+			}
+			if(histHitsDUT2->GetBinContent(i,j) >= 1){
+				AverageBinHistogram(histToAvDUT2,histHitsDUT2,i,j);
+			}
+			if(histHitsDUT3->GetBinContent(i,j) >= 1){
+				AverageBinHistogram(histToAvDUT3,histHitsDUT3,i,j);
+			}
+		}
+	}
+}
+
+void AverageBinHistogram(TH2F *histToAv, TH2F *histHits, Int_t binx, Int_t biny){
+	Double_t temp = (Double_t)(histToAv->GetBinContent(binx,biny)/(Double_t)histHits->GetBinContent(binx,biny));
+	histToAv->SetBinContent(binx,biny,temp);
 }
