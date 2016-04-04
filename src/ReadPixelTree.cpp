@@ -44,6 +44,8 @@ void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath,
 
 void FindAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histToAvDUT2, TH2F *histHitsDUT2, TH2F *histToAvDUT3, TH2F *histHitsDUT3, Int_t xbins, Int_t ybins);
 
+void FindAverageHistogramTPlanes(TH2F *histToAvTPlane0, TH2F *histHitsTPlane0, TH2F *histToAvTPlane1, TH2F *histHitsTPlane1, TH2F *histToAvTPlane2, TH2F *histHitsTPlane2, TH2F *histToAvTPlane3, TH2F *histHitsTPlane3, Int_t xbins, Int_t ybins);
+
 void AverageBinHistogram(TH2F *histToAv, TH2F *histHits, Int_t binx, Int_t biny);
 
 const char *rootFilePathComplete = "~/Data/psi_2015_10/root/pixel/TrackedRun312.root";
@@ -156,10 +158,23 @@ void Prueba(char *rootFilePath,char *outputPath){
 	TH2F *avPHSi = new TH2F("avPHSi","Average PH Silicon",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 	TH1F *phSi = new TH1F("phSi","Pulse Height Silicon",501,-10210,200210);
 
+	TH2F *avPHPlane0 = new TH2F("avPHPlane0","Average PH Plane 0",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH1F *phPlane0 = new TH1F("phPlane0","Pulse Height Plane 0",501,-250,250250);
+	TH2F *avPHPlane1 = new TH2F("avPHPlane1","Average PH Plane 1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH1F *phPlane1 = new TH1F("phPlane1","Pulse Height Plane 1",501,-250,250250);
+	TH2F *avPHPlane2 = new TH2F("avPHPlane2","Average PH Plane 2",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH1F *phPlane2 = new TH1F("phPlane2","Pulse Height Plane 2",501,-250,250250);
+	TH2F *avPHPlane3 = new TH2F("avPHPlane3","Average PH Plane 3",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH1F *phPlane3 = new TH1F("phPlane3","Pulse Height Plane 3",501,-250,250250);
+
 	TH2F *hitMapPHDia1 = new TH2F("hitMapPHDia1","Hit Map Diamond 1 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 	TH2F *hitMapPHDia2 = new TH2F("hitMapPHDia2","Hit Map Diamond 2 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 	TH2F *hitMapPHSi = new TH2F("hitMapPHSi","Hit Map Si for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 
+	TH2F *hitMapPHPlane0 = new TH2F("hitMapPHPlane0","Hit Map Plane 0 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH2F *hitMapPHPlane1 = new TH2F("hitMapPHPlane1","Hit Map Plane 1 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH2F *hitMapPHPlane2 = new TH2F("hitMapPHPlane2","Hit Map Plane 2 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+	TH2F *hitMapPHPlane3 = new TH2F("hitMapPHPlane3","Hit Map Plane 3 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
 
 	Double_t tempADC = 0;
 	avADCDia1->SetContour(contour2D);
@@ -177,6 +192,11 @@ void Prueba(char *rootFilePath,char *outputPath){
 	avPHDia2->SetContour(contour2D);
 	avPHSi->SetContour(contour2D);
 
+	avPHPlane0->SetContour(contour2D);
+	avPHPlane1->SetContour(contour2D);
+	avPHPlane2->SetContour(contour2D);
+	avPHPlane3->SetContour(contour2D);
+
 	avADCDia1->SetMinimum(0);
 	avADCDia2->SetMinimum(0);
 	avADCSi->SetMinimum(0);
@@ -191,6 +211,11 @@ void Prueba(char *rootFilePath,char *outputPath){
 	avPHDia1->SetMinimum(0);
 	avPHDia2->SetMinimum(0);
 	avPHSi->SetMinimum(0);
+
+	avPHPlane0->SetMinimum(0);
+	avPHPlane1->SetMinimum(0);
+	avPHPlane2->SetMinimum(0);
+	avPHPlane3->SetMinimum(0);
 
 	TH1F *colP3 = new TH1F("colP3","colP3",61,-0.5,60.5);
 	TH1F *rowP3 = new TH1F("rowP3","rowP3",91,-0.5,90.5);
@@ -244,7 +269,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 		}
 
 		// Get the number of cluster for each DUT roc
-		for(Int_t i = 4; i < 7; i++){
+		for(Int_t i = 0; i < 7; i++){
 			numCLROC[i] = (Int_t)clust_per_plane->at(i);
 		}
 		// For Diamond 1
@@ -253,13 +278,24 @@ void Prueba(char *rootFilePath,char *outputPath){
 		PhHistogramExtraction(numCLROC[5], ph_ROC5_1cl, clust_ROC5_X, clust_ROC5_Y, phDia2, avPHDia2, hitMapPHDia2);
 		// For Silicon
 		PhHistogramExtraction(numCLROC[6], ph_ROC6_1cl, clust_ROC6_X, clust_ROC6_Y, phSi, avPHSi, hitMapPHSi);
+		// For Plane 0
+		PhHistogramExtraction(numCLROC[0], ph_ROC0_1cl, clust_ROC0_X, clust_ROC0_Y, phPlane0, avPHPlane0, hitMapPHPlane0);
+		// For Plane 1
+		PhHistogramExtraction(numCLROC[1], ph_ROC1_1cl, clust_ROC1_X, clust_ROC1_Y, phPlane1, avPHPlane1, hitMapPHPlane1);
+		// For Plane 2
+		PhHistogramExtraction(numCLROC[2], ph_ROC2_1cl, clust_ROC2_X, clust_ROC2_Y, phPlane2, avPHPlane2, hitMapPHPlane2);
+		// For Plane 3
+		PhHistogramExtraction(numCLROC[3], ph_ROC3_1cl, clust_ROC3_X, clust_ROC3_Y, phPlane3, avPHPlane3, hitMapPHPlane3);
 	}
 
-	// average for ADC
+	// average for ADC DUT
 	FindAverageHistogramDUT(avADCDia1, hitPlane4, avADCDia2, hitPlane5, avADCSi, hitPlane6, 52, 80);
 
-	// average for PH
+	// average for PH DUT
 	FindAverageHistogramDUT(avPHDia1,hitMapPHDia1,avPHDia2,hitMapPHDia2,avPHSi,hitMapPHSi,divXR1,divYR1);
+
+	//average for PH Telescope Planes
+	FindAverageHistogramTPlanes(avPHPlane0,hitMapPHPlane0,avPHPlane1,hitMapPHPlane1,avPHPlane2,hitMapPHPlane2,avPHPlane3,hitMapPHPlane3,divXR1,divYR1);
 
 	// Plot histograms
 	PlotHistogram2D(hitPlane0,"Hit map Plane 0",outputPath,"HitMapPlane0.png");
@@ -282,9 +318,28 @@ void Prueba(char *rootFilePath,char *outputPath){
 	PlotHistogram2D(avPHDia2,"PH Average Diamond 2",outputPath,"AvPHD2.png");
 	PlotHistogram2D(avPHSi,"PH Average Silicon",outputPath,"AvPHSi.png");
 
+	PlotHistogram2D(avPHPlane0,"PH Average Plane 0",outputPath,"AvPHTPlane0.png");
+	PlotHistogram2D(avPHPlane1,"PH Average Plane 1",outputPath,"AvPHTPlane1.png");
+	PlotHistogram2D(avPHPlane2,"PH Average Plane 2",outputPath,"AvPHTPlane2.png");
+	PlotHistogram2D(avPHPlane3,"PH Average Plane 3",outputPath,"AvPHTPlane3.png");
+
+	PlotHistogram2D(hitMapPHDia1,"Hit Map Diamond 1 for PH",outputPath,"HitMapPHDia1.png");
+	PlotHistogram2D(hitMapPHDia2,"Hit Map Diamond 2 for PH",outputPath,"HitMapPHDia2.png");
+	PlotHistogram2D(hitMapPHSi,"Hit Map Silicon for PH",outputPath,"HitMapPHSi.png");
+
+	PlotHistogram2D(hitMapPHPlane0,"Hit Map Plane 0 for PH",outputPath,"HitMapPHTPlane0.png");
+	PlotHistogram2D(hitMapPHPlane1,"Hit Map Plane 1 for PH",outputPath,"HitMapPHTPlane1.png");
+	PlotHistogram2D(hitMapPHPlane2,"Hit Map Plane 2 for PH",outputPath,"HitMapPHTPlane2.png");
+	PlotHistogram2D(hitMapPHPlane3,"Hit Map Plane 3 for PH",outputPath,"HitMapPHTPlane3.png");
+
 	PlotHistogram1D(phDia1, kTRUE, kFALSE, "PH Diamond 1", outputPath, "PHD1.png");
 	PlotHistogram1D(phDia2, kTRUE, kFALSE, "PH Diamond 2", outputPath, "PHD2.png");
 	PlotHistogram1D(phSi, kTRUE, kFALSE, "PH Silicon", outputPath, "PHSi.png");
+
+	PlotHistogram1D(phPlane0, kTRUE, kFALSE, "PH Plane 0", outputPath, "PHTPlane0.png");
+	PlotHistogram1D(phPlane1, kTRUE, kFALSE, "PH Plane 1", outputPath, "PHTPlane1.png");
+	PlotHistogram1D(phPlane2, kTRUE, kFALSE, "PH Plane 2", outputPath, "PHTPlane2.png");
+	PlotHistogram1D(phPlane3, kTRUE, kFALSE, "PH Plane 3", outputPath, "PHTPlane3.png");
 
 	// Save histograms
 	TFile f(Form("%s%s",outputPath,histogramOutputFile),"RECREATE");
@@ -304,9 +359,30 @@ void Prueba(char *rootFilePath,char *outputPath){
 	avADCDia1->Write();
 	avADCDia2->Write();
 	avADCSi->Write();
+
 	avPHDia1->Write();
 	avPHDia2->Write();
 	avPHSi->Write();
+	avPHPlane0->Write();
+	avPHPlane1->Write();
+	avPHPlane2->Write();
+	avPHPlane3->Write();
+
+	phDia1->Write();
+	phDia2->Write();
+	phSi->Write();
+	phPlane0->Write();
+	phPlane1->Write();
+	phPlane2->Write();
+	phPlane3->Write();
+
+	hitMapPHDia1->Write();
+	hitMapPHDia2->Write();
+	hitMapPHSi->Write();
+	hitMapPHPlane0->Write();
+	hitMapPHPlane1->Write();
+	hitMapPHPlane2->Write();
+	hitMapPHPlane3->Write();
 
 	f.Close();
 
@@ -364,6 +440,25 @@ void FindAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histT
 			}
 			if(histHitsDUT3->GetBinContent(i,j) >= 1){
 				AverageBinHistogram(histToAvDUT3,histHitsDUT3,i,j);
+			}
+		}
+	}
+}
+
+void FindAverageHistogramTPlanes(TH2F *histToAvTPlane0, TH2F *histHitsTPlane0, TH2F *histToAvTPlane1, TH2F *histHitsTPlane1, TH2F *histToAvTPlane2, TH2F *histHitsTPlane2, TH2F *histToAvTPlane3, TH2F *histHitsTPlane3, Int_t xbins, Int_t ybins){
+	for (Int_t i = 1; i <= xbins; i++){
+		for (Int_t j = 1; j <= ybins; j++){
+			if(histHitsTPlane0->GetBinContent(i,j) >= 1){
+				AverageBinHistogram(histToAvTPlane0,histHitsTPlane0,i,j);
+			}
+			if(histHitsTPlane1->GetBinContent(i,j) >= 1){
+				AverageBinHistogram(histToAvTPlane1,histHitsTPlane1,i,j);
+			}
+			if(histHitsTPlane2->GetBinContent(i,j) >= 1){
+				AverageBinHistogram(histToAvTPlane2,histHitsTPlane2,i,j);
+			}
+			if(histHitsTPlane3->GetBinContent(i,j) >= 1){
+				AverageBinHistogram(histToAvTPlane3,histHitsTPlane3,i,j);
 			}
 		}
 	}
