@@ -7,6 +7,13 @@
 //============================================================================
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <iomanip>
+#include <stdlib.h>
+#include <stdint.h>
+
 using namespace std;
 #include "TFile.h"
 #include "TTree.h"
@@ -31,14 +38,17 @@ using namespace std;
 #include "TRandom3.h"
 #include "TRandom.h"
 #include "TChain.h"
+#include "TGraphErrors.h"
 
 void Prueba(char *rootFilePath, char *outputPath);
 
 TChain * ReadPixRootFile(const char *fileName);
 
-void PhHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *clust_ROC_X, vector<float> *clust_ROC_Y, TH1F *phDUT, TH2F *avPHDUT, TH2F *hitMapPHDUT);
+void Ph1DHistogramsExtraction(int numCLROC, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TH1F *phHall, TH1F *phH1, TH1F *phH2, TH1F *phH3, TH1F *phHM4);
 
-void PlotHistogram1D(TH1F *histogram, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix);
+void Ph2DHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *clust_ROC_X, vector<float> *clust_ROC_Y, TH2F *avPHDUT, TH2F *hitMapPHDUT, float deltaX, float deltaY, Bool_t isRowCol);
+
+void PlotPulseHeightsOverlay(TH1F *phall, TH1F *ph1, TH1F *ph2, TH1F *ph3, TH1F *phM4, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix);
 
 void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath, const char *suffix);
 
@@ -48,6 +58,10 @@ void FindAverageHistogramTPlanes(TH2F *histToAvTPlane0, TH2F *histHitsTPlane0, T
 
 void AverageBinHistogram(TH2F *histToAv, TH2F *histHits, Int_t binx, Int_t biny);
 
+void MaskPixelsFromFile(const string maskFile);
+
+Bool_t IsMasked(Int_t roc, Int_t col, Int_t row);
+
 const char *rootFilePathComplete = "~/Data/psi_2015_10/root/pixel/TrackedRun312.root";
 const char *rootFilePathSmall = "~/DataSmall/psi_2015_10/root/pixel/TrackedRun312.root";
 
@@ -56,17 +70,22 @@ const char *outputPathSmall = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/Smal
 
 const char *histogramOutputFile = "Histograms.root";
 
-Int_t contour2D = 1024;
-Float_t xminR1 = -6.075, xmaxR1 = 6.075, yminR1 = -6.05, ymaxR1 = 6.05;
-Int_t divXR1 = 81, divYR1 = 121;
+const string maskFile = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/maskFile.msk";
+
+vector<int> *mskdroc = 0, *mskdcol = 0, *mskdrow = 0;
+
+Int_t contour2D = 1024, mean1Dbins = 100, numBinCol = 52, numBinRow = 80, minCol = 0, maxCol = 51, minRow = 0, maxRow = 79;
+Float_t xminR1 = -6.075, xmaxR1 = 6.075, yminR1 = -6.05, ymaxR1 = 6.05, ph1Dmin=0, ph1Dmax=50000;
+Int_t divXR1 = 81, divYR1 = 121, ph1Dbins=100;
 Float_t deltaXR1 = (Float_t)((xmaxR1-xminR1)/divXR1), deltaYR1 = (Float_t)((ymaxR1-yminR1)/divYR1);
 
 int main() {
 	gROOT->ProcessLine("#include <vector>");
 	gSystem->Load("libMathCore");
 	gSystem->Load("libPhysics");
-	const char *rootFilePath = rootFilePathComplete;
-	const char *outputPath = outputPathComplete;
+	const char *rootFilePath = rootFilePathSmall;
+	const char *outputPath = outputPathSmall;
+	cout << "Starting Analysis" << endl;
 	Prueba((char *)rootFilePath, (char *)outputPath);
 	return 0;
 }
@@ -79,23 +98,38 @@ TChain * ReadPixRootFile(const char *fileName){
 
 void Prueba(char *rootFilePath,char *outputPath){
 	//Create Chain to read tree
+	cout << "Reading Root file: " << rootFilePath << endl;
 	TChain *chain1 = ReadPixRootFile(rootFilePath);
 	//Make pointers to branches
 	TBranch *braPlane = chain1->GetBranch("plane");
 	//Create variables to read the tree
 	vector<int> *plane=0, *col=0, *row=0, *adc=0;
+	vector<vector<float> *> clust_row, clust_col;
 	vector<unsigned char> *clust_per_plane=0;
-	vector<float> *clust_ROC0_X = 0, *clust_ROC0_Y = 0, *ph_ROC0_1cl = 0, *clust_ROC1_X = 0, *clust_ROC1_Y = 0, *ph_ROC1_1cl = 0;
-	vector<float> *clust_ROC2_X = 0, *clust_ROC2_Y = 0, *ph_ROC2_1cl = 0, *clust_ROC3_X = 0, *clust_ROC3_Y = 0, *ph_ROC3_1cl = 0;
-	vector<float> *clust_ROC4_X = 0, *clust_ROC4_Y = 0, *ph_ROC4_1cl = 0, *clust_ROC5_X = 0, *clust_ROC5_Y = 0, *ph_ROC5_1cl = 0, *clust_ROC6_X = 0, *clust_ROC6_Y = 0, *ph_ROC6_1cl = 0;
-	Float_t time=0, dia1X=0, dia1Y=0, dia2X=0, dia2Y=0, chi2_tracks=0, chi2_x=0, chi2_y=0, slope_x=0, slope_y=0;
-	Int_t event_number=0;
+	vector<vector<float> *> charge_all, clust_Telescope_X, clust_Telescope_Y, clust_Local_X, clust_Local_Y, ph_1cl, ph_2cl, ph_3cl, ph_M4cl;
+	Float_t time=0, dia1X=0, dia1Y=0, dia2X=0, dia2Y=0, chi2_tracks=0, chi2_x=0, chi2_y=0, slope_x=0, slope_y=0, coincidence_map=0;
+	Int_t event_number=0, hit_plane_bits=0, n_tracks=0, n_cluster=0;
 	//Int_t n_tracks = 0, n_cluster = 0;
 	//dimension variables
 	vector<int> numCLROC;
 	numCLROC.resize(7);
 	Int_t numPlane = 0, numCol = 0, numRow = 0, numADC = 0;
 	Long64_t numEntries = braPlane->GetEntries();
+	Long64_t maxphplots=(Long64_t)8*numEntries/100;
+
+	//MaskPixelsFromFile(maskFile);
+
+	clust_row.resize(7);
+	clust_col.resize(7);
+	charge_all.resize(7);
+	clust_Telescope_X.resize(7);
+	clust_Telescope_Y.resize(7);
+	clust_Local_X.resize(7);
+	clust_Local_Y.resize(7);
+	ph_1cl.resize(7);
+	ph_2cl.resize(7);
+	ph_3cl.resize(7);
+	ph_M4cl.resize(7);
 
 	chain1->SetBranchAddress("event_number",&event_number);
 	chain1->SetBranchAddress("time",&time);
@@ -103,6 +137,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 	chain1->SetBranchAddress("col",&col);
 	chain1->SetBranchAddress("row",&row);
 	chain1->SetBranchAddress("adc",&adc);
+	chain1->SetBranchAddress("hit_plane_bits",&hit_plane_bits);
 	chain1->SetBranchAddress("diam1_track_x",&dia1X);
 	chain1->SetBranchAddress("diam1_track_y",&dia1Y);
 	chain1->SetBranchAddress("diam2_track_x",&dia2X);
@@ -112,113 +147,193 @@ void Prueba(char *rootFilePath,char *outputPath){
 	chain1->SetBranchAddress("chi2_y",&chi2_y);
 	chain1->SetBranchAddress("slope_x",&slope_x);
 	chain1->SetBranchAddress("slope_y",&slope_y);
-	//chain1->SetBranchAddress("n_tracks",&n_tracks);
-	//chain1->SetBranchAddress("n_cluster",&n_cluster);
+	chain1->SetBranchAddress("n_tracks",&n_tracks);
+	chain1->SetBranchAddress("n_cluster",&n_cluster);
 	chain1->SetBranchAddress("clusters_per_plane",&clust_per_plane);
-	chain1->SetBranchAddress("cluster_pos_ROC0_X",&clust_ROC0_X);
-	chain1->SetBranchAddress("cluster_pos_ROC0_Y",&clust_ROC0_Y);
-	chain1->SetBranchAddress("pulse_height_ROC0_1_cluster",&ph_ROC0_1cl);
-	chain1->SetBranchAddress("cluster_pos_ROC1_X",&clust_ROC1_X);
-	chain1->SetBranchAddress("cluster_pos_ROC1_Y",&clust_ROC1_Y);
-	chain1->SetBranchAddress("pulse_height_ROC1_1_cluster",&ph_ROC1_1cl);
-	chain1->SetBranchAddress("cluster_pos_ROC2_X",&clust_ROC2_X);
-	chain1->SetBranchAddress("cluster_pos_ROC2_Y",&clust_ROC2_Y);
-	chain1->SetBranchAddress("pulse_height_ROC2_1_cluster",&ph_ROC2_1cl);
-	chain1->SetBranchAddress("cluster_pos_ROC3_X",&clust_ROC3_X);
-	chain1->SetBranchAddress("cluster_pos_ROC3_Y",&clust_ROC3_Y);
-	chain1->SetBranchAddress("pulse_height_ROC3_1_cluster",&ph_ROC3_1cl);
-	chain1->SetBranchAddress("cluster_pos_ROC4_X",&clust_ROC4_X);
-	chain1->SetBranchAddress("cluster_pos_ROC4_Y",&clust_ROC4_Y);
-	chain1->SetBranchAddress("pulse_height_ROC4_1_cluster",&ph_ROC4_1cl);
-	chain1->SetBranchAddress("cluster_pos_ROC5_X",&clust_ROC5_X);
-	chain1->SetBranchAddress("cluster_pos_ROC5_Y",&clust_ROC5_Y);
-	chain1->SetBranchAddress("pulse_height_ROC5_1_cluster",&ph_ROC5_1cl);
-	chain1->SetBranchAddress("cluster_pos_ROC6_X",&clust_ROC6_X);
-	chain1->SetBranchAddress("cluster_pos_ROC6_Y",&clust_ROC6_Y);
-	chain1->SetBranchAddress("pulse_height_ROC6_1_cluster",&ph_ROC6_1cl);
+	chain1->SetBranchAddress("coincidence_map",&coincidence_map);
+	// ROCs
+	for(Int_t iROC = 0; iROC<7; iROC++){
+		TString branch_name_charge = TString::Format("charge_all_ROC%d",iROC);
+		chain1->SetBranchAddress(branch_name_charge,&(charge_all[iROC]));
+		TString branch_name_cluster_Telescope_X = TString::Format("cluster_pos_ROC%d_Telescope_X",iROC);
+		chain1->SetBranchAddress(branch_name_cluster_Telescope_X,&(clust_Telescope_X[iROC]));
+		TString branch_name_cluster_Telescope_Y = TString::Format("cluster_pos_ROC%d_Telescope_Y",iROC);
+		chain1->SetBranchAddress(branch_name_cluster_Telescope_Y,&(clust_Telescope_Y[iROC]));
+		TString branch_name_cluster_Local_X = TString::Format("cluster_pos_ROC%d_Local_X",iROC);
+		chain1->SetBranchAddress(branch_name_cluster_Local_X,&(clust_Local_X[iROC]));
+		TString branch_name_cluster_Local_Y = TString::Format("cluster_pos_ROC%d_Local_Y",iROC);
+		chain1->SetBranchAddress(branch_name_cluster_Local_Y,&(clust_Local_Y[iROC]));
+		TString branch_name_cluster_row = TString::Format("cluster_row_ROC%d",iROC);
+		chain1->SetBranchAddress(branch_name_cluster_row,&(clust_row[iROC]));
+		TString branch_name_cluster_col = TString::Format("cluster_col_ROC%d",iROC);
+		chain1->SetBranchAddress(branch_name_cluster_col,&(clust_col[iROC]));
+		TString branch_name_pulse_height_1pix_cluster = TString::Format("pulse_height_ROC%d_1_cluster",iROC);
+		chain1->SetBranchAddress(branch_name_pulse_height_1pix_cluster,&(ph_1cl[iROC]));
+		TString branch_name_pulse_height_2pix_cluster = TString::Format("pulse_height_ROC%d_2_cluster",iROC);
+		chain1->SetBranchAddress(branch_name_pulse_height_2pix_cluster,&(ph_2cl[iROC]));
+		TString branch_name_pulse_height_3pix_cluster = TString::Format("pulse_height_ROC%d_3_cluster",iROC);
+		chain1->SetBranchAddress(branch_name_pulse_height_3pix_cluster,&(ph_3cl[iROC]));
+		TString branch_name_pulse_height_M4pix_cluster = TString::Format("pulse_height_ROC%d_More4_cluster",iROC);
+		chain1->SetBranchAddress(branch_name_pulse_height_M4pix_cluster,&(ph_M4cl[iROC]));
+	}
 
-	TH2F *hitPlane0 = new TH2F("hitPlane0","Hit map Plane 0",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *hitPlane1 = new TH2F("hitPlane1","Hit map Plane 1",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *hitPlane2 = new TH2F("hitPlane2","Hit map Plane 2",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *hitPlane3 = new TH2F("hitPlane3","Hit map Plane 3",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *hitPlane4 = new TH2F("hitPlane4","Hit map Plane 4",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *hitPlane5 = new TH2F("hitPlane5","Hit map Plane 5",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *hitPlane6 = new TH2F("hitPlane6","Hit map Plane 6",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *avADCDia1 = new TH2F("avADCDia1","Average ADC Diamond 1",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *avADCDia2 = new TH2F("avADCDia2","Average ADC Diamond 2",52,-0.5,51.5,80,-0.5,79.5);
-	TH2F *avADCSi = new TH2F("avADCSi","Average ADC Si",52,-0.5,51.5,80,-0.5,79.5);
-	TH1F *adcDia1 = new TH1F("adcDia1","ADC Diamond 1",541,-270.5,270.5);
-	TH1F *adcDia2 = new TH1F("adcDia2","ADC Diamond 2",541,-270.5,270.5);
-	TH1F *adcSi = new TH1F("adcSi","ADC Si",541,-270.5,270.5);
 
-	TH2F *avPHDia1 = new TH2F("avPHDia1","Average PH Diamond 1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH1F *phDia1 = new TH1F("phDia1","Pulse Height Diamond 1",501,-250,250250);
-	TH2F *avPHDia2 = new TH2F("avPHDia2","Average PH Diamond 2",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH1F *phDia2 = new TH1F("phDia2","Pulse Height Diamond 2",501,-2052,50052);
-	TH2F *avPHSi = new TH2F("avPHSi","Average PH Silicon",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH1F *phSi = new TH1F("phSi","Pulse Height Silicon",501,-10210,200210);
+	// 1D Histograms
+	TH1F *coincidenceMap = new TH1F("coincidenceMap","Coincidence Map",141,-0.5,140.5);
+	TH1F *phDummy = new TH1F("phDummy","Pulse Height Dummy",ph1Dbins+1,ph1Dmin-(ph1Dmax-ph1Dmin)/(2*ph1Dbins),ph1Dmax+(ph1Dmax-ph1Dmin)/(2*ph1Dbins));
 
-	TH2F *avPHPlane0 = new TH2F("avPHPlane0","Average PH Plane 0",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH1F *phPlane0 = new TH1F("phPlane0","Pulse Height Plane 0",501,-250,250250);
-	TH2F *avPHPlane1 = new TH2F("avPHPlane1","Average PH Plane 1",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH1F *phPlane1 = new TH1F("phPlane1","Pulse Height Plane 1",501,-250,250250);
-	TH2F *avPHPlane2 = new TH2F("avPHPlane2","Average PH Plane 2",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH1F *phPlane2 = new TH1F("phPlane2","Pulse Height Plane 2",501,-250,250250);
-	TH2F *avPHPlane3 = new TH2F("avPHPlane3","Average PH Plane 3",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH1F *phPlane3 = new TH1F("phPlane3","Pulse Height Plane 3",501,-250,250250);
+	// ROCs
+	TH1F *phROC_all[7], *phROC_1cl[7], *phROC_2cl[7], *phROC_3cl[7], *phROC_M4cl[7];
+	TGraphErrors *meanPhROC_all[7], *meanPhROC_1cl[7], *meanPhROC_2cl[7], *meanPhROC_3cl[7], *meanPhROC_M4cl[7];
+	TH2F *hitMap[7], *avPhROC_local_1cl[7], *phROC_hitMap_local_1cl[7], *avPhROC_pix_1cl[7], *phROC_hitMap_pix_1cl[7];
+	for(Int_t iROC = 0; iROC<7; iROC++){
+		// 1D Histograms Draw with ape and same
+		TString hist_name_pulse_height_all = TString::Format("phROC%d_all",iROC);
+		TString hist_title_pulse_height_all = TString::Format("Pulse Height ROC%d all cluster",iROC);
+		phROC_all[iROC] = new TH1F(hist_name_pulse_height_all,hist_title_pulse_height_all,ph1Dbins+1,ph1Dmin-(ph1Dmax-ph1Dmin)/(2*ph1Dbins),ph1Dmax+(ph1Dmax-ph1Dmin)/(2*ph1Dbins));
+		phROC_all[iROC]->GetXaxis()->SetTitle("Charge (e)");
+		phROC_all[iROC]->GetYaxis()->SetTitle("Num Clusters");
+		phROC_all[iROC]->SetMaximum(maxphplots);
+		phROC_all[iROC]->SetMinimum(0);
+		phROC_all[iROC]->SetLineColor(1); // black
+		TString hist_name_pulse_height_1cl = TString::Format("phROC%d_1cl",iROC);
+		TString hist_title_pulse_height_1cl = TString::Format("Pulse Height ROC%d 1pix cluster",iROC);
+		phROC_1cl[iROC] = new TH1F(hist_name_pulse_height_1cl,hist_title_pulse_height_1cl,ph1Dbins+1,ph1Dmin-(ph1Dmax-ph1Dmin)/(2*ph1Dbins),ph1Dmax+(ph1Dmax-ph1Dmin)/(2*ph1Dbins));
+		phROC_1cl[iROC]->GetXaxis()->SetTitle("Charge (e)");
+		phROC_1cl[iROC]->GetYaxis()->SetTitle("Num Clusters");
+		phROC_1cl[iROC]->SetMaximum(maxphplots);
+		phROC_1cl[iROC]->SetMinimum(0);
+		phROC_1cl[iROC]->SetLineColor(4); // blue
+		TString hist_name_pulse_height_2cl = TString::Format("phROC%d_2cl",iROC);
+		TString hist_title_pulse_height_2cl = TString::Format("Pulse Height ROC%d 2pix cluster",iROC);
+		phROC_2cl[iROC] = new TH1F(hist_name_pulse_height_2cl,hist_title_pulse_height_2cl,ph1Dbins+1,ph1Dmin-(ph1Dmax-ph1Dmin)/(2*ph1Dbins),ph1Dmax+(ph1Dmax-ph1Dmin)/(2*ph1Dbins));
+		phROC_2cl[iROC]->GetXaxis()->SetTitle("Charge (e)");
+		phROC_2cl[iROC]->GetYaxis()->SetTitle("Num Clusters");
+		phROC_2cl[iROC]->SetMaximum(maxphplots);
+		phROC_2cl[iROC]->SetMinimum(0);
+		phROC_2cl[iROC]->SetLineColor(3); // green
+		TString hist_name_pulse_height_3cl = TString::Format("phROC%d_3cl",iROC);
+		TString hist_title_pulse_height_3cl = TString::Format("Pulse Height ROC%d 3pix cluster",iROC);
+		phROC_3cl[iROC] = new TH1F(hist_name_pulse_height_3cl,hist_title_pulse_height_3cl,ph1Dbins+1,ph1Dmin-(ph1Dmax-ph1Dmin)/(2*ph1Dbins),ph1Dmax+(ph1Dmax-ph1Dmin)/(2*ph1Dbins));
+		phROC_3cl[iROC]->GetXaxis()->SetTitle("Charge (e)");
+		phROC_3cl[iROC]->GetYaxis()->SetTitle("Num Clusters");
+		phROC_3cl[iROC]->SetMaximum(maxphplots);
+		phROC_3cl[iROC]->SetMinimum(0);
+		phROC_3cl[iROC]->SetLineColor(2); // red
+		TString hist_name_pulse_height_M4cl = TString::Format("phROC%d_M4cl",iROC);
+		TString hist_title_pulse_height_M4cl = TString::Format("Pulse Height ROC%d M4pix cluster",iROC);
+		phROC_M4cl[iROC] = new TH1F(hist_name_pulse_height_M4cl,hist_title_pulse_height_M4cl,ph1Dbins+1,ph1Dmin-(ph1Dmax-ph1Dmin)/(2*ph1Dbins),ph1Dmax+(ph1Dmax-ph1Dmin)/(2*ph1Dbins));
+		phROC_M4cl[iROC]->GetXaxis()->SetTitle("Charge (e)");
+		phROC_M4cl[iROC]->GetYaxis()->SetTitle("Num Clusters");
+		phROC_M4cl[iROC]->SetMaximum(maxphplots);
+		phROC_M4cl[iROC]->SetMinimum(0);
+		phROC_M4cl[iROC]->SetLineColor(6); // magenta
+		// 1D TGraphErrors Draw with hist and samehist
+		meanPhROC_all[iROC] = new TGraphErrors(mean1Dbins);
+		TString tgraph_name_mean_pulse_height_all = TString::Format("meanPHROC%d_all",iROC);
+		TString tgraph_title_mean_pulse_height_all = TString::Format("Mean Pulse Height ROC%d all cluster",iROC);
+		meanPhROC_all[iROC]->SetName(tgraph_name_mean_pulse_height_all);
+		meanPhROC_all[iROC]->SetTitle(tgraph_title_mean_pulse_height_all);
+		meanPhROC_all[iROC]->GetXaxis()->SetTitle("Event Number");
+		meanPhROC_all[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
+		meanPhROC_all[iROC]->SetMinimum(0);
+		meanPhROC_all[iROC]->SetMaximum(numEntries);
+		meanPhROC_all[iROC]->SetLineColor(1); // black
+		meanPhROC_all[iROC]->SetMarkerColor(1); // black
 
-	TH2F *hitMapPHDia1 = new TH2F("hitMapPHDia1","Hit Map Diamond 1 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *hitMapPHDia2 = new TH2F("hitMapPHDia2","Hit Map Diamond 2 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *hitMapPHSi = new TH2F("hitMapPHSi","Hit Map Si for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+		meanPhROC_1cl[iROC] = new TGraphErrors(mean1Dbins);
+		TString tgraph_name_mean_pulse_height_1cl = TString::Format("meanPHROC%d_1cl",iROC);
+		TString tgraph_title_mean_pulse_height_1cl = TString::Format("Mean Pulse Height ROC%d 1pix cluster",iROC);
+		meanPhROC_1cl[iROC]->SetName(tgraph_name_mean_pulse_height_1cl);
+		meanPhROC_1cl[iROC]->SetTitle(tgraph_title_mean_pulse_height_1cl);
+		meanPhROC_1cl[iROC]->GetXaxis()->SetTitle("Event Number");
+		meanPhROC_1cl[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
+		meanPhROC_1cl[iROC]->SetMinimum(0);
+		meanPhROC_1cl[iROC]->SetMaximum(numEntries);
+		meanPhROC_1cl[iROC]->SetLineColor(4); // blue
+		meanPhROC_1cl[iROC]->SetMarkerColor(4); // blue
 
-	TH2F *hitMapPHPlane0 = new TH2F("hitMapPHPlane0","Hit Map Plane 0 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *hitMapPHPlane1 = new TH2F("hitMapPHPlane1","Hit Map Plane 1 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *hitMapPHPlane2 = new TH2F("hitMapPHPlane2","Hit Map Plane 2 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-	TH2F *hitMapPHPlane3 = new TH2F("hitMapPHPlane3","Hit Map Plane 3 for PH",divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+		meanPhROC_2cl[iROC] = new TGraphErrors(mean1Dbins);
+		TString tgraph_name_mean_pulse_height_2cl = TString::Format("meanPHROC%d_2cl",iROC);
+		TString tgraph_title_mean_pulse_height_2cl = TString::Format("Mean Pulse Height ROC%d 2pix cluster",iROC);
+		meanPhROC_2cl[iROC]->SetName(tgraph_name_mean_pulse_height_2cl);
+		meanPhROC_2cl[iROC]->SetTitle(tgraph_title_mean_pulse_height_2cl);
+		meanPhROC_2cl[iROC]->GetXaxis()->SetTitle("Event Number");
+		meanPhROC_2cl[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
+		meanPhROC_2cl[iROC]->SetMinimum(0);
+		meanPhROC_2cl[iROC]->SetMaximum(numEntries);
+		meanPhROC_2cl[iROC]->SetLineColor(3); // green
+		meanPhROC_2cl[iROC]->SetMarkerColor(3); // green
+
+		meanPhROC_3cl[iROC] = new TGraphErrors(mean1Dbins);
+		TString tgraph_name_mean_pulse_height_3cl = TString::Format("meanPHROC%d_3cl",iROC);
+		TString tgraph_title_mean_pulse_height_3cl = TString::Format("Mean Pulse Height ROC%d 3pix cluster",iROC);
+		meanPhROC_3cl[iROC]->SetName(tgraph_name_mean_pulse_height_3cl);
+		meanPhROC_3cl[iROC]->SetTitle(tgraph_title_mean_pulse_height_3cl);
+		meanPhROC_3cl[iROC]->GetXaxis()->SetTitle("Event Number");
+		meanPhROC_3cl[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
+		meanPhROC_3cl[iROC]->SetMinimum(0);
+		meanPhROC_3cl[iROC]->SetMaximum(numEntries);
+		meanPhROC_3cl[iROC]->SetLineColor(2); // red
+		meanPhROC_3cl[iROC]->SetMarkerColor(2); // red
+
+		meanPhROC_M4cl[iROC] = new TGraphErrors(mean1Dbins);
+		TString tgraph_name_mean_pulse_height_M4cl = TString::Format("meanPHROC%d_M4cl",iROC);
+		TString tgraph_title_mean_pulse_height_M4cl = TString::Format("Mean Pulse Height ROC%d M4pix cluster",iROC);
+		meanPhROC_M4cl[iROC]->SetName(tgraph_name_mean_pulse_height_M4cl);
+		meanPhROC_M4cl[iROC]->SetTitle(tgraph_title_mean_pulse_height_M4cl);
+		meanPhROC_M4cl[iROC]->GetXaxis()->SetTitle("Event Number");
+		meanPhROC_M4cl[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
+		meanPhROC_M4cl[iROC]->SetMinimum(0);
+		meanPhROC_M4cl[iROC]->SetMaximum(numEntries);
+		meanPhROC_M4cl[iROC]->SetLineColor(6); // magenta
+		meanPhROC_M4cl[iROC]->SetMarkerColor(6); // magenta
+
+		// 2D Histograms
+		TString hist_name_hitMap = TString::Format("hitMapROC%d",iROC);
+		TString hist_title_histMap = TString::Format("Hit Map ROC%d",iROC);
+		hitMap[iROC] = new TH2F(hist_name_hitMap,hist_title_histMap,numBinCol,minCol-0.5,maxCol+0.5,numBinRow,minRow-0.5,maxRow+0.5);
+		hitMap[iROC]->GetXaxis()->SetTitle("Column");
+		hitMap[iROC]->GetYaxis()->SetTitle("Row");
+		hitMap[iROC]->SetContour(contour2D);
+		hitMap[iROC]->SetMinimum(0);
+
+//		TString hist_name_pulse_height_local_1cl = TString::Format("avPh_ROC%d_local_1cl",iROC);
+//		TString hist_title_pulse_height_local_1cl = TString::Format("Average Pulse Height ROC%d Local Coord. 1pix cluster",iROC);
+//		avPhROC_local_1cl[iROC] = new TH2F(hist_name_pulse_height_local_1cl,hist_title_pulse_height_local_1cl,divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+//		avPhROC_local_1cl[iROC]->GetXaxis()->SetTitle("x (mm)");
+//		avPhROC_local_1cl[iROC]->GetYaxis()->SetTitle("y (mm)");
+//		avPhROC_local_1cl[iROC]->SetContour(contour2D);
+//		avPhROC_local_1cl[iROC]->SetMinimum(0);
+
+//		TString hist_name_pulse_height_hitMap_local_1cl = TString::Format("ph_ROC%d_hitMap_local_1cl",iROC);
+//		TString hist_title_pulse_height_hitMap_local_1cl = TString::Format("Pulse Height ROC%d Hit Map Local Coord. 1pix cluster",iROC);
+//		phROC_hitMap_local_1cl[iROC] = new TH2F(hist_name_pulse_height_hitMap_local_1cl,hist_title_pulse_height_hitMap_local_1cl,divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+//		phROC_hitMap_local_1cl[iROC]->GetXaxis()->SetTitle("x (mm)");
+//		phROC_hitMap_local_1cl[iROC]->GetYaxis()->SetTitle("y (mm)");
+//		phROC_hitMap_local_1cl[iROC]->SetContour(contour2D);
+//		phROC_hitMap_local_1cl[iROC]->SetMinimum(0);
+
+		TString hist_name_pulse_height_pix_1cl = TString::Format("avPh_ROC%d_pix_1cl",iROC);
+		TString hist_title_pulse_height_pix_1cl = TString::Format("Average Pulse Height ROC%d pixelated Coord. 1pix cluster",iROC);
+		avPhROC_pix_1cl[iROC] = new TH2F(hist_name_pulse_height_pix_1cl,hist_title_pulse_height_pix_1cl,numBinCol,minCol-0.5,maxCol+0.5,numBinRow,minRow-0.5,maxRow+0.5);
+		avPhROC_pix_1cl[iROC]->GetXaxis()->SetTitle("Column");
+		avPhROC_pix_1cl[iROC]->GetYaxis()->SetTitle("Row");
+		avPhROC_pix_1cl[iROC]->SetContour(contour2D);
+		avPhROC_pix_1cl[iROC]->SetMinimum(0);
+
+		TString hist_name_pulse_height_hitMap_pix_1cl = TString::Format("ph_ROC%d_hitMap_pix_1cl",iROC);
+		TString hist_title_pulse_height_hitMap_pix_1cl = TString::Format("Pulse Height ROC%d Hit Map pixelated Coord. 1pix cluster",iROC);
+		phROC_hitMap_pix_1cl[iROC] = new TH2F(hist_name_pulse_height_hitMap_pix_1cl,hist_title_pulse_height_hitMap_pix_1cl,numBinCol,minCol-0.5,maxCol+0.5,numBinRow,minRow-0.5,maxRow+0.5);
+		phROC_hitMap_pix_1cl[iROC]->GetXaxis()->SetTitle("Column");
+		phROC_hitMap_pix_1cl[iROC]->GetYaxis()->SetTitle("Row");
+		phROC_hitMap_pix_1cl[iROC]->SetContour(contour2D);
+		phROC_hitMap_pix_1cl[iROC]->SetMinimum(0);
+	}
 
 	Double_t tempADC = 0;
-	avADCDia1->SetContour(contour2D);
-	avADCDia2->SetContour(contour2D);
-	avADCSi->SetContour(contour2D);
-	hitPlane0->SetContour(contour2D);
-	hitPlane1->SetContour(contour2D);
-	hitPlane2->SetContour(contour2D);
-	hitPlane3->SetContour(contour2D);
-	hitPlane4->SetContour(contour2D);
-	hitPlane5->SetContour(contour2D);
-	hitPlane6->SetContour(contour2D);
 
-	avPHDia1->SetContour(contour2D);
-	avPHDia2->SetContour(contour2D);
-	avPHSi->SetContour(contour2D);
-
-	avPHPlane0->SetContour(contour2D);
-	avPHPlane1->SetContour(contour2D);
-	avPHPlane2->SetContour(contour2D);
-	avPHPlane3->SetContour(contour2D);
-
-	avADCDia1->SetMinimum(0);
-	avADCDia2->SetMinimum(0);
-	avADCSi->SetMinimum(0);
-	hitPlane0->SetMinimum(0);
-	hitPlane1->SetMinimum(0);
-	hitPlane2->SetMinimum(0);
-	hitPlane3->SetMinimum(0);
-	hitPlane4->SetMinimum(0);
-	hitPlane5->SetMinimum(0);
-	hitPlane6->SetMinimum(0);
-
-	avPHDia1->SetMinimum(0);
-	avPHDia2->SetMinimum(0);
-	avPHSi->SetMinimum(0);
-
-	avPHPlane0->SetMinimum(0);
-	avPHPlane1->SetMinimum(0);
-	avPHPlane2->SetMinimum(0);
-	avPHPlane3->SetMinimum(0);
-
-	TH1F *colP3 = new TH1F("colP3","colP3",61,-0.5,60.5);
-	TH1F *rowP3 = new TH1F("rowP3","rowP3",91,-0.5,90.5);
+	cout << "Reading first entry." << endl;
 
 	for(Long64_t i = 0; i < numEntries; i++){
 		chain1->GetEntry(i);
@@ -229,37 +344,26 @@ void Prueba(char *rootFilePath,char *outputPath){
 
 		if(numPlane & numCol & numRow == numADC){
 			for(Int_t j = 0; j < numPlane; j++){
-				colP3->Fill(col->at(j));
-				rowP3->Fill(row->at(j));
 				if(plane->at(j)==0){
-					hitPlane0->Fill(col->at(j),row->at(j));
+					hitMap[0]->Fill(col->at(j),row->at(j));
 				}
 				else if(plane->at(j) == 1){
-					hitPlane1->Fill(col->at(j),row->at(j));
+					hitMap[1]->Fill(col->at(j),row->at(j));
 				}
 				else if(plane->at(j) == 2){
-					hitPlane2->Fill(col->at(j),row->at(j));
+					hitMap[2]->Fill(col->at(j),row->at(j));
 				}
 				else if(plane->at(j) == 3){
-					hitPlane3->Fill(col->at(j),row->at(j));
+					hitMap[3]->Fill(col->at(j),row->at(j));
 				}
 				else if(plane->at(j) == 4){
-					hitPlane4->Fill(col->at(j),row->at(j));
-					tempADC = (Double_t)avADCDia1->GetBinContent(col->at(j)+1,row->at(j)+1)+adc->at(j);
-					avADCDia1->SetBinContent(col->at(j)+1,row->at(j)+1,tempADC);
-					adcDia1->Fill(adc->at(j));
+					hitMap[4]->Fill(col->at(j),row->at(j));
 				}
 				else if(plane->at(j) == 5){
-					hitPlane5->Fill(col->at(j),row->at(j));
-					tempADC = (Double_t)avADCDia2->GetBinContent(col->at(j)+1,row->at(j)+1)+adc->at(j);
-					avADCDia2->SetBinContent(col->at(j)+1,row->at(j)+1,tempADC);
-					adcDia2->Fill(adc->at(j));
+					hitMap[5]->Fill(col->at(j),row->at(j));
 				}
 				else if(plane->at(j) == 6){
-					hitPlane6->Fill(col->at(j),row->at(j));
-					tempADC = (Double_t)avADCSi->GetBinContent(col->at(j)+1,row->at(j)+1)+adc->at(j);
-					avADCSi->SetBinContent(col->at(j)+1,row->at(j)+1,tempADC);
-					adcSi->Fill(adc->at(j));
+					hitMap[6]->Fill(col->at(j),row->at(j));
 				}
 				else{
 					cout << "ERROR. PLANE DOES NOT EXIST"<<endl;
@@ -268,157 +372,180 @@ void Prueba(char *rootFilePath,char *outputPath){
 			}
 		}
 
-		// Get the number of cluster for each DUT roc
-		for(Int_t i = 0; i < 7; i++){
-			numCLROC[i] = (Int_t)clust_per_plane->at(i);
+		for(Int_t iROC = 0; iROC < 7; iROC++){
+			numCLROC[iROC] = (Int_t)clust_per_plane->at(iROC);
+			Ph1DHistogramsExtraction(numCLROC[iROC], ph_1cl[iROC], ph_2cl[iROC], ph_3cl[iROC], ph_M4cl[iROC], phROC_all[iROC], phROC_1cl[iROC], phROC_2cl[iROC], phROC_3cl[iROC], phROC_M4cl[iROC]);
+//			Ph2DHistogramExtraction(numCLROC[iROC], ph_1cl[iROC], clust_Local_X[iROC],clust_Local_Y[iROC],avPhROC_local_1cl[iROC],phROC_hitMap_local_1cl[iROC],deltaXR1,deltaYR1,kFALSE);
+			Ph2DHistogramExtraction(numCLROC[iROC], ph_1cl[iROC], clust_col[iROC],clust_row[iROC],avPhROC_pix_1cl[iROC],phROC_hitMap_pix_1cl[iROC],1,1,kTRUE);
 		}
-		// For Diamond 1
-		PhHistogramExtraction(numCLROC[4], ph_ROC4_1cl, clust_ROC4_X, clust_ROC4_Y, phDia1, avPHDia1, hitMapPHDia1);
-		// For Diamond 2
-		PhHistogramExtraction(numCLROC[5], ph_ROC5_1cl, clust_ROC5_X, clust_ROC5_Y, phDia2, avPHDia2, hitMapPHDia2);
-		// For Silicon
-		PhHistogramExtraction(numCLROC[6], ph_ROC6_1cl, clust_ROC6_X, clust_ROC6_Y, phSi, avPHSi, hitMapPHSi);
-		// For Plane 0
-		PhHistogramExtraction(numCLROC[0], ph_ROC0_1cl, clust_ROC0_X, clust_ROC0_Y, phPlane0, avPHPlane0, hitMapPHPlane0);
-		// For Plane 1
-		PhHistogramExtraction(numCLROC[1], ph_ROC1_1cl, clust_ROC1_X, clust_ROC1_Y, phPlane1, avPHPlane1, hitMapPHPlane1);
-		// For Plane 2
-		PhHistogramExtraction(numCLROC[2], ph_ROC2_1cl, clust_ROC2_X, clust_ROC2_Y, phPlane2, avPHPlane2, hitMapPHPlane2);
-		// For Plane 3
-		PhHistogramExtraction(numCLROC[3], ph_ROC3_1cl, clust_ROC3_X, clust_ROC3_Y, phPlane3, avPHPlane3, hitMapPHPlane3);
+		Float_t progress;
+		if(i == 0) cout << endl;
+		else if(i%100 == 0){
+			cout << "\r";
+			//cout << "\e[A\r";
+			progress = i*100/(Float_t)numEntries;
+			cout << "Progress: " << setprecision(2) << setw(4) << setfill('0') << fixed << progress;
+			cout << setw(1) << "%";
+		}
 	}
 
-	// average for ADC DUT
-	FindAverageHistogramDUT(avADCDia1, hitPlane4, avADCDia2, hitPlane5, avADCSi, hitPlane6, 52, 80);
-
 	// average for PH DUT
-	FindAverageHistogramDUT(avPHDia1,hitMapPHDia1,avPHDia2,hitMapPHDia2,avPHSi,hitMapPHSi,divXR1,divYR1);
+//	FindAverageHistogramDUT(avPhROC_local_1cl[4],phROC_hitMap_local_1cl[4],avPhROC_local_1cl[5],phROC_hitMap_local_1cl[5],avPhROC_local_1cl[6],phROC_hitMap_local_1cl[6],divXR1,divYR1);
+	FindAverageHistogramDUT(avPhROC_pix_1cl[4],phROC_hitMap_pix_1cl[4],avPhROC_pix_1cl[5],phROC_hitMap_pix_1cl[5],avPhROC_pix_1cl[6],phROC_hitMap_pix_1cl[6],numBinCol,numBinRow);
 
 	//average for PH Telescope Planes
-	FindAverageHistogramTPlanes(avPHPlane0,hitMapPHPlane0,avPHPlane1,hitMapPHPlane1,avPHPlane2,hitMapPHPlane2,avPHPlane3,hitMapPHPlane3,divXR1,divYR1);
+//	FindAverageHistogramTPlanes(avPhROC_local_1cl[0],phROC_hitMap_local_1cl[0],avPhROC_local_1cl[1],phROC_hitMap_local_1cl[1],avPhROC_local_1cl[2],phROC_hitMap_local_1cl[2],avPhROC_local_1cl[3],phROC_hitMap_local_1cl[3],divXR1,divYR1);
+	FindAverageHistogramTPlanes(avPhROC_pix_1cl[0],phROC_hitMap_pix_1cl[0],avPhROC_pix_1cl[1],phROC_hitMap_pix_1cl[1],avPhROC_pix_1cl[2],phROC_hitMap_pix_1cl[2],avPhROC_pix_1cl[3],phROC_hitMap_pix_1cl[3],numBinCol,numBinRow);
 
-	// Plot histograms
-	PlotHistogram2D(hitPlane0,"Hit map Plane 0",outputPath,"HitMapPlane0.png");
-	PlotHistogram2D(hitPlane1,"Hit map Plane 1",outputPath,"HitMapPlane1.png");
-	PlotHistogram2D(hitPlane2,"Hit map Plane 2",outputPath,"HitMapPlane2.png");
-	PlotHistogram2D(hitPlane3,"Hit map Plane 3",outputPath,"HitMapPlane3.png");
-	PlotHistogram2D(hitPlane4,"Hit map Plane 4",outputPath,"HitMapPlane4.png");
-	PlotHistogram2D(hitPlane5,"Hit map Plane 5",outputPath,"HitMapPlane5.png");
-	PlotHistogram2D(hitPlane6,"Hit map Plane 6",outputPath,"HitMapPlane6.png");
-
-	PlotHistogram2D(avADCDia1,"ADC Average Diamond 1",outputPath,"AvADCD1.png");
-	PlotHistogram2D(avADCDia2,"ADC Average Diamond 2",outputPath,"AvADCD2.png");
-	PlotHistogram2D(avADCSi,"ADC Average Silicon",outputPath,"AvADCSi.png");
-
-	PlotHistogram1D(adcDia1, kTRUE, kFALSE, "ADC Diamond 1", outputPath, "ADCD1.png");
-	PlotHistogram1D(adcDia2, kTRUE, kFALSE, "ADC Diamond 2", outputPath, "ADCD2.png");
-	PlotHistogram1D(adcSi, kTRUE, kFALSE, "ADC Silicon", outputPath, "ADCSi.png");
-
-	PlotHistogram2D(avPHDia1,"PH Average Diamond 1",outputPath,"AvPHD1.png");
-	PlotHistogram2D(avPHDia2,"PH Average Diamond 2",outputPath,"AvPHD2.png");
-	PlotHistogram2D(avPHSi,"PH Average Silicon",outputPath,"AvPHSi.png");
-
-	PlotHistogram2D(avPHPlane0,"PH Average Plane 0",outputPath,"AvPHTPlane0.png");
-	PlotHistogram2D(avPHPlane1,"PH Average Plane 1",outputPath,"AvPHTPlane1.png");
-	PlotHistogram2D(avPHPlane2,"PH Average Plane 2",outputPath,"AvPHTPlane2.png");
-	PlotHistogram2D(avPHPlane3,"PH Average Plane 3",outputPath,"AvPHTPlane3.png");
-
-	PlotHistogram2D(hitMapPHDia1,"Hit Map Diamond 1 for PH",outputPath,"HitMapPHDia1.png");
-	PlotHistogram2D(hitMapPHDia2,"Hit Map Diamond 2 for PH",outputPath,"HitMapPHDia2.png");
-	PlotHistogram2D(hitMapPHSi,"Hit Map Silicon for PH",outputPath,"HitMapPHSi.png");
-
-	PlotHistogram2D(hitMapPHPlane0,"Hit Map Plane 0 for PH",outputPath,"HitMapPHTPlane0.png");
-	PlotHistogram2D(hitMapPHPlane1,"Hit Map Plane 1 for PH",outputPath,"HitMapPHTPlane1.png");
-	PlotHistogram2D(hitMapPHPlane2,"Hit Map Plane 2 for PH",outputPath,"HitMapPHTPlane2.png");
-	PlotHistogram2D(hitMapPHPlane3,"Hit Map Plane 3 for PH",outputPath,"HitMapPHTPlane3.png");
-
-	PlotHistogram1D(phDia1, kTRUE, kFALSE, "PH Diamond 1", outputPath, "PHD1.png");
-	PlotHistogram1D(phDia2, kTRUE, kFALSE, "PH Diamond 2", outputPath, "PHD2.png");
-	PlotHistogram1D(phSi, kTRUE, kFALSE, "PH Silicon", outputPath, "PHSi.png");
-
-	PlotHistogram1D(phPlane0, kTRUE, kFALSE, "PH Plane 0", outputPath, "PHTPlane0.png");
-	PlotHistogram1D(phPlane1, kTRUE, kFALSE, "PH Plane 1", outputPath, "PHTPlane1.png");
-	PlotHistogram1D(phPlane2, kTRUE, kFALSE, "PH Plane 2", outputPath, "PHTPlane2.png");
-	PlotHistogram1D(phPlane3, kTRUE, kFALSE, "PH Plane 3", outputPath, "PHTPlane3.png");
+	// Plot
+	for(Int_t iROC=0;iROC<7;iROC++){
+		if(iROC==4){
+			// Histograms
+			// 2D
+			TString canvas_name_HitMapD1("Hit Map ROC4 Diamond 1");
+			TString image_name_HitMapD1("HitMapROC4D1.png");
+			PlotHistogram2D(hitMap[iROC],canvas_name_HitMapD1,outputPath,image_name_HitMapD1);
+//			TString canvas_name_avPHD1_local("Average PH ROC4 Diamond 1 Local Coord.");
+//			TString image_name_avPHD1_local("AvPHROC4D1Local.png");
+//			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHD1_local,outputPath,image_name_avPHD1_local);
+			TString canvas_name_avPHD1_pix("Average PH ROC4 Diamond 1 Pixelated Coord.");
+			TString image_name_avPHD1_pix("AvPHROC4D1Pix.png");
+			PlotHistogram2D(avPhROC_pix_1cl[iROC],canvas_name_avPHD1_pix,outputPath,image_name_avPHD1_pix);
+			// 1D
+			TString canvas_name_phD1("Pulse Height ROC4 Diamond 1");
+			TString image_name_phD1("PhROC4D1.png");
+			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phD1,outputPath,image_name_phD1);
+		}
+		else if(iROC == 5){
+			// 2D
+			TString canvas_name_HitMapD2("Hit Map ROC5 Diamond 2");
+			TString image_name_HitMapD2("HitMapROC5D2.png");
+			PlotHistogram2D(hitMap[iROC],canvas_name_HitMapD2,outputPath,image_name_HitMapD2);
+//			TString canvas_name_avPHD2_local("Average PH ROC5 Diamond 2 Local Coord.");
+//			TString image_name_avPHD2_local("AvPHROC5D2Local.png");
+//			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHD2_local,outputPath,image_name_avPHD2_local);
+			TString canvas_name_avPHD2_pix("Average PH ROC5 Diamond 2 Pixelated Coord.");
+			TString image_name_avPHD2_pix("AvPHROC5D2Pix.png");
+			PlotHistogram2D(avPhROC_pix_1cl[iROC],canvas_name_avPHD2_pix,outputPath,image_name_avPHD2_pix);
+			// 1D
+			TString canvas_name_phD2("Pulse Height ROC5 Diamond 2");
+			TString image_name_phD2("PhROC5D2.png");
+			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phD2,outputPath,image_name_phD2);
+		}
+		else if(iROC == 6){
+			// 2D
+			TString canvas_name_HitMapSi("Hit Map ROC6 Silicon");
+			TString image_name_HitMapSi("HitMapROC6Si.png");
+			PlotHistogram2D(hitMap[iROC],canvas_name_HitMapSi,outputPath,image_name_HitMapSi);
+//			TString canvas_name_avPHSi_local("Average PH ROC6 Silicon Local Coord.");
+//			TString image_name_avPHSi_local("AvPHROC6SiLocal.png");
+//			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHSi_local,outputPath,image_name_avPHSi_local);
+			TString canvas_name_avPHSi_pix("Average PH ROC6 Silicon Pixelated Coord.");
+			TString image_name_avPHSi_pix("AvPHROC6SiPix.png");
+			PlotHistogram2D(avPhROC_pix_1cl[iROC],canvas_name_avPHSi_pix,outputPath,image_name_avPHSi_pix);
+			// 1D
+			TString canvas_name_phSi("Pulse Height ROC6 Silicon");
+			TString image_name_phSi("PhROC6Si.png");
+			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phSi,outputPath,image_name_phSi);
+		}
+		else{
+			// 2D
+			TString canvas_name_HitMap = TString::Format("Hit Map ROC%d",iROC);
+			TString image_name_HitMap = TString::Format("HitMapROC%d.png",iROC);
+			PlotHistogram2D(hitMap[iROC],canvas_name_HitMap,outputPath,image_name_HitMap);
+//			TString canvas_name_avPH_local = TString::Format("Average PH ROC%d Local Coord.",iROC);
+//			TString image_name_avPH_local = TString::Format("AvPHROC%dLocal.png",iROC);
+//			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPH_local,outputPath,image_name_avPH_local);
+			TString canvas_name_avPH_pix = TString::Format("Average PH ROC%d Pixelated Coord.",iROC);
+			TString image_name_avPH_pix = TString::Format("AvPHROC%dPix.png",iROC);
+			PlotHistogram2D(avPhROC_pix_1cl[iROC],canvas_name_avPH_pix,outputPath,image_name_avPH_pix);
+			// 1D
+			TString canvas_name_ph(Form("Pulse Height ROC%d",iROC));
+			TString image_name_ph(Form("PhROC%d.png",iROC));
+			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_ph,outputPath,image_name_ph);
+		}
+	}
 
 	// Save histograms
 	TFile f(Form("%s%s",outputPath,histogramOutputFile),"RECREATE");
-	adcDia1->Write();
-	adcDia2->Write();
-	adcSi->Write();
-	phDia1->Write();
-	phDia2->Write();
-	phSi->Write();
-	hitPlane0->Write();
-	hitPlane1->Write();
-	hitPlane2->Write();
-	hitPlane3->Write();
-	hitPlane4->Write();
-	hitPlane5->Write();
-	hitPlane6->Write();
-	avADCDia1->Write();
-	avADCDia2->Write();
-	avADCSi->Write();
-
-	avPHDia1->Write();
-	avPHDia2->Write();
-	avPHSi->Write();
-	avPHPlane0->Write();
-	avPHPlane1->Write();
-	avPHPlane2->Write();
-	avPHPlane3->Write();
-
-	phDia1->Write();
-	phDia2->Write();
-	phSi->Write();
-	phPlane0->Write();
-	phPlane1->Write();
-	phPlane2->Write();
-	phPlane3->Write();
-
-	hitMapPHDia1->Write();
-	hitMapPHDia2->Write();
-	hitMapPHSi->Write();
-	hitMapPHPlane0->Write();
-	hitMapPHPlane1->Write();
-	hitMapPHPlane2->Write();
-	hitMapPHPlane3->Write();
+	for(Int_t iROC = 0; iROC<7;iROC++){
+		hitMap[iROC]->Write();
+//		avPhROC_local_1cl[iROC]->Write();
+		avPhROC_pix_1cl[iROC]->Write();
+		phROC_all[iROC]->Write();
+		phROC_1cl[iROC]->Write();
+		phROC_2cl[iROC]->Write();
+		phROC_3cl[iROC]->Write();
+		phROC_M4cl[iROC]->Write();
+	}
 
 	f.Close();
 
 
 }
 
-void PhHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *clust_ROC_X, vector<float> *clust_ROC_Y, TH1F *phDUT, TH2F *avPHDUT, TH2F *hitMapPHDUT){
+void Ph1DHistogramsExtraction(int numCLROC, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TH1F *phHall, TH1F *phH1, TH1F *phH2, TH1F *phH3, TH1F *phHM4){
+	if(numCLROC != 0){
+		for(Int_t i = 0; i < ph1->size(); i++){
+			phH1->Fill(ph1->at(i));
+			phHall->Fill(ph1->at(i));
+		}
+		for(Int_t i = 0; i < ph2->size(); i++){
+			phH2->Fill(ph2->at(i));
+			phHall->Fill(ph2->at(i));
+		}
+		for(Int_t i = 0; i < ph3->size(); i++){
+			phH3->Fill(ph3->at(i));
+			phHall->Fill(ph3->at(i));
+		}
+		for (Int_t i = 0; i < phM4->size(); i++) {
+			phHM4->Fill(phM4->at(i));
+			phHall->Fill(phM4->at(i));
+		}
+	}
+}
+
+void Ph2DHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *clust_ROC_X, vector<float> *clust_ROC_Y, TH2F *avPHDUT, TH2F *hitMapPHDUT, float deltaX, float deltaY ,Bool_t isRowCol){
 	if(numCLROC != 0){
 		int numPhROC = phROC->size();
 		Int_t tempBinX = 0, tempBinY = 0;
 		Double_t tempPH = 0;
 		for(Int_t i = 0; i < numPhROC; i++){
 			if(clust_ROC_X->size() >= numPhROC && clust_ROC_Y->size() >= numPhROC){
-				tempBinX = (Int_t)(TMath::Ceil((Float_t)((clust_ROC_X->at(i)*10-xminR1)/deltaXR1)));
-				tempBinY = (Int_t)(TMath::Ceil((Float_t)((clust_ROC_Y->at(i)*10-yminR1)/deltaYR1)));
-				phDUT->Fill(phROC->at(i));
-				if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR1 && tempBinY <= divYR1){
-					tempPH = (Double_t)(avPHDUT->GetBinContent(tempBinX,tempBinY)+phROC->at(i));
-					avPHDUT->SetBinContent(tempBinX,tempBinY,tempPH);
-					hitMapPHDUT->Fill(tempBinX,tempBinY);
+				if(isRowCol){
+					tempBinX = (Int_t)clust_ROC_X->at(i)+1;
+					tempBinY = (Int_t)clust_ROC_Y->at(i)+1;
 				}
+				else{
+					tempBinX = (Int_t)(TMath::CeilNint((Float_t)((clust_ROC_X->at(i)*10-xminR1)/(Float_t)deltaX)));
+					tempBinY = (Int_t)(TMath::CeilNint((Float_t)((clust_ROC_Y->at(i)*10-yminR1)/(Float_t)deltaY)));
+				}
+				//if(!IsMasked(roc,tempBinX,tempBinY)){
+					if( tempBinX >= 1 && tempBinY >= 1 && tempBinX <= divXR1 && tempBinY <= divYR1){
+						tempPH = (Double_t)(avPHDUT->GetBinContent(tempBinX,tempBinY)+phROC->at(i));
+						avPHDUT->SetBinContent(tempBinX,tempBinY,tempPH);
+						if(isRowCol)
+							hitMapPHDUT->Fill(clust_ROC_X->at(i),clust_ROC_Y->at(i));
+						else
+							hitMapPHDUT->Fill(10*clust_ROC_X->at(i),10*clust_ROC_Y->at(i));
+					}
+				//}
 			}
 		}
 	}
 }
 
-void PlotHistogram1D(TH1F *histogram, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix){
+void PlotPulseHeightsOverlay(TH1F *phall, TH1F *ph1, TH1F *ph2, TH1F *ph3, TH1F *phM4, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix){
 	TCanvas *c1 = new TCanvas("c1",title,1);
 	c1->cd();
-	if(logX)
-		c1->SetLogx();
-	if(logY)
-		c1->SetLogy();
-	histogram->Draw("E1 SAME HIST");
+	if(logX) {c1->SetLogx();}
+	if(logY) {c1->SetLogy();}
+	phall->Draw("hist");
+	ph1->Draw("hist same");
+	ph2->Draw("hist same");
+	ph3->Draw("hist same");
+	phM4->Draw("hist same");
 	c1->SaveAs(Form("%s%s",outputPath,suffix));
-	delete c1;
 }
 
 void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath, const char *suffix){
@@ -467,4 +594,36 @@ void FindAverageHistogramTPlanes(TH2F *histToAvTPlane0, TH2F *histHitsTPlane0, T
 void AverageBinHistogram(TH2F *histToAv, TH2F *histHits, Int_t binx, Int_t biny){
 	Double_t temp = (Double_t)(histToAv->GetBinContent(binx,biny)/(Double_t)histHits->GetBinContent(binx,biny));
 	histToAv->SetBinContent(binx,biny,temp);
+}
+
+void MaskPixelsFromFile(const string maskFile){
+	cout << "Reading the mask file: " << maskFile << endl;
+	vector<int> temproc, tempcol, temprow;
+	std::ifstream inFile(maskFile.c_str());
+	if(!inFile.is_open()){
+		cerr << "ERROR: Cannot open mask file: " << maskFile << endl;
+		throw;
+	}
+	for(std::string line; getline(inFile,line);){
+		int row = 0, col = 0, roc=0;
+		if(line[0] == '#' || line[0] == ' ' || line[0] == '/' || line[0] == '%') continue;
+		std::istringstream linestream;
+		linestream.str(line);
+		linestream >> roc >> col >> row;
+		temproc.push_back(roc);
+		temprow.push_back(row);
+		tempcol.push_back(col);
+	}
+	mskdroc = &temproc;
+	mskdcol = &tempcol;
+	mskdrow = &temprow;
+}
+
+Bool_t IsMasked(Int_t roc, Int_t col, Int_t row){
+	if(mskdcol->empty()) return kFALSE;
+	for(Int_t i = 0; i < mskdcol->size(); i++){
+		if(mskdrow->at(i) == row && mskdcol->at(i) == col && mskdroc->at(i) == roc)
+			return kTRUE;
+	}
+	return kFALSE;
 }

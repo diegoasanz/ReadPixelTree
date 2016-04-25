@@ -8,6 +8,9 @@ set(SOURCE_FILES src/ReadPixelTree.cpp)
 add_executable(ReadPixelTree ${SOURCE_FILES})
 
 set(CMAKE_INCLUDE_PATH `root-config --incdir`)
+set(COMANDO1 root-config)
+EXEC_PROGRAM(${COMANDO1} ARGS --incdir OUTPUT_VARIABLE ROOT_INC_DIR)
+include_directories(${ROOT_INC_DIR})
 
 set(CMAKE_LIBRARY_PATH `root-config --libs --glibs --auxlibs`)
 
