@@ -39,6 +39,7 @@ using namespace std;
 #include "TRandom.h"
 #include "TChain.h"
 #include "TGraphErrors.h"
+#include "TStyle.h"
 
 void Prueba(char *rootFilePath, char *outputPath);
 
@@ -74,7 +75,7 @@ const string maskFile = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/maskFile.m
 
 vector<int> *mskdroc = 0, *mskdcol = 0, *mskdrow = 0;
 
-Int_t contour2D = 1024, mean1Dbins = 100, numBinCol = 52, numBinRow = 80, minCol = 0, maxCol = 51, minRow = 0, maxRow = 79;
+Int_t contour2D = 1024, mean1Dbins = 100, numBinCol = 52, numBinRow = 80, minCol = 0, maxCol = 51, minRow = 0, maxRow = 79, binWidthTGraph=2000;
 Float_t xminR1 = -6.075, xmaxR1 = 6.075, yminR1 = -6.05, ymaxR1 = 6.05, ph1Dmin=0, ph1Dmax=50000;
 Int_t divXR1 = 81, divYR1 = 121, ph1Dbins=100;
 Float_t deltaXR1 = (Float_t)((xmaxR1-xminR1)/divXR1), deltaYR1 = (Float_t)((ymaxR1-yminR1)/divYR1);
@@ -108,7 +109,8 @@ void Prueba(char *rootFilePath,char *outputPath){
 	vector<unsigned char> *clust_per_plane=0;
 	vector<vector<float> *> charge_all, clust_Telescope_X, clust_Telescope_Y, clust_Local_X, clust_Local_Y, ph_1cl, ph_2cl, ph_3cl, ph_M4cl;
 	Float_t time=0, dia1X=0, dia1Y=0, dia2X=0, dia2Y=0, chi2_tracks=0, chi2_x=0, chi2_y=0, slope_x=0, slope_y=0, coincidence_map=0;
-	Int_t event_number=0, hit_plane_bits=0, n_tracks=0, n_cluster=0;
+	Int_t event_number=0;
+	UChar_t hit_plane_bits=0, n_tracks=0, n_clusters=0;
 	//Int_t n_tracks = 0, n_cluster = 0;
 	//dimension variables
 	vector<int> numCLROC;
@@ -148,7 +150,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 	chain1->SetBranchAddress("slope_x",&slope_x);
 	chain1->SetBranchAddress("slope_y",&slope_y);
 	chain1->SetBranchAddress("n_tracks",&n_tracks);
-	chain1->SetBranchAddress("n_cluster",&n_cluster);
+	chain1->SetBranchAddress("n_clusters",&n_clusters);
 	chain1->SetBranchAddress("clusters_per_plane",&clust_per_plane);
 	chain1->SetBranchAddress("coincidence_map",&coincidence_map);
 	// ROCs
@@ -180,12 +182,11 @@ void Prueba(char *rootFilePath,char *outputPath){
 
 	// 1D Histograms
 	TH1F *coincidenceMap = new TH1F("coincidenceMap","Coincidence Map",141,-0.5,140.5);
-	TH1F *phDummy = new TH1F("phDummy","Pulse Height Dummy",ph1Dbins+1,ph1Dmin-(ph1Dmax-ph1Dmin)/(2*ph1Dbins),ph1Dmax+(ph1Dmax-ph1Dmin)/(2*ph1Dbins));
 
 	// ROCs
 	TH1F *phROC_all[7], *phROC_1cl[7], *phROC_2cl[7], *phROC_3cl[7], *phROC_M4cl[7];
 	TGraphErrors *meanPhROC_all[7], *meanPhROC_1cl[7], *meanPhROC_2cl[7], *meanPhROC_3cl[7], *meanPhROC_M4cl[7];
-	TH2F *hitMap[7], *avPhROC_local_1cl[7], *phROC_hitMap_local_1cl[7], *avPhROC_pix_1cl[7], *phROC_hitMap_pix_1cl[7];
+	TH2F *hitMap[7], *avPhROC_local_1cl[7], *phROC_hitMap_local_1cl[7], *avPhROC_pix_1cl[7], *phROC_hitMap_pix_1cl[7], *avPhROC_telescope_1cl[7], *phROC_hitMap_telescope_1cl[7];
 	for(Int_t iROC = 0; iROC<7; iROC++){
 		// 1D Histograms Draw with ape and same
 		TString hist_name_pulse_height_all = TString::Format("phROC%d_all",iROC);
@@ -290,6 +291,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 		meanPhROC_M4cl[iROC]->SetMarkerColor(6); // magenta
 
 		// 2D Histograms
+		// ROC
 		TString hist_name_hitMap = TString::Format("hitMapROC%d",iROC);
 		TString hist_title_histMap = TString::Format("Hit Map ROC%d",iROC);
 		hitMap[iROC] = new TH2F(hist_name_hitMap,hist_title_histMap,numBinCol,minCol-0.5,maxCol+0.5,numBinRow,minRow-0.5,maxRow+0.5);
@@ -297,23 +299,39 @@ void Prueba(char *rootFilePath,char *outputPath){
 		hitMap[iROC]->GetYaxis()->SetTitle("Row");
 		hitMap[iROC]->SetContour(contour2D);
 		hitMap[iROC]->SetMinimum(0);
+		// LOCAL
+		TString hist_name_pulse_height_local_1cl = TString::Format("avPh_ROC%d_local_1cl",iROC);
+		TString hist_title_pulse_height_local_1cl = TString::Format("Average Pulse Height ROC%d Local Coord. 1pix cluster",iROC);
+		avPhROC_local_1cl[iROC] = new TH2F(hist_name_pulse_height_local_1cl,hist_title_pulse_height_local_1cl,divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+		avPhROC_local_1cl[iROC]->GetXaxis()->SetTitle("x (mm)");
+		avPhROC_local_1cl[iROC]->GetYaxis()->SetTitle("y (mm)");
+		avPhROC_local_1cl[iROC]->SetContour(contour2D);
+		avPhROC_local_1cl[iROC]->SetMinimum(0);
 
-//		TString hist_name_pulse_height_local_1cl = TString::Format("avPh_ROC%d_local_1cl",iROC);
-//		TString hist_title_pulse_height_local_1cl = TString::Format("Average Pulse Height ROC%d Local Coord. 1pix cluster",iROC);
-//		avPhROC_local_1cl[iROC] = new TH2F(hist_name_pulse_height_local_1cl,hist_title_pulse_height_local_1cl,divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-//		avPhROC_local_1cl[iROC]->GetXaxis()->SetTitle("x (mm)");
-//		avPhROC_local_1cl[iROC]->GetYaxis()->SetTitle("y (mm)");
-//		avPhROC_local_1cl[iROC]->SetContour(contour2D);
-//		avPhROC_local_1cl[iROC]->SetMinimum(0);
+		TString hist_name_pulse_height_hitMap_local_1cl = TString::Format("ph_ROC%d_hitMap_local_1cl",iROC);
+		TString hist_title_pulse_height_hitMap_local_1cl = TString::Format("Pulse Height ROC%d Hit Map Local Coord. 1pix cluster",iROC);
+		phROC_hitMap_local_1cl[iROC] = new TH2F(hist_name_pulse_height_hitMap_local_1cl,hist_title_pulse_height_hitMap_local_1cl,divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+		phROC_hitMap_local_1cl[iROC]->GetXaxis()->SetTitle("x (mm)");
+		phROC_hitMap_local_1cl[iROC]->GetYaxis()->SetTitle("y (mm)");
+		phROC_hitMap_local_1cl[iROC]->SetContour(contour2D);
+		phROC_hitMap_local_1cl[iROC]->SetMinimum(0);
+		// TELESCOPE
+		TString hist_name_pulse_height_telescope_1cl = TString::Format("avPh_ROC%d_telescope_1cl",iROC);
+		TString hist_title_pulse_height_telescope_1cl = TString::Format("Average Pulse Height ROC%d telescope Coord. 1pix cluster",iROC);
+		avPhROC_telescope_1cl[iROC] = new TH2F(hist_name_pulse_height_telescope_1cl,hist_title_pulse_height_telescope_1cl,divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+		avPhROC_telescope_1cl[iROC]->GetXaxis()->SetTitle("x (mm)");
+		avPhROC_telescope_1cl[iROC]->GetYaxis()->SetTitle("y (mm)");
+		avPhROC_telescope_1cl[iROC]->SetContour(contour2D);
+		avPhROC_telescope_1cl[iROC]->SetMinimum(0);
 
-//		TString hist_name_pulse_height_hitMap_local_1cl = TString::Format("ph_ROC%d_hitMap_local_1cl",iROC);
-//		TString hist_title_pulse_height_hitMap_local_1cl = TString::Format("Pulse Height ROC%d Hit Map Local Coord. 1pix cluster",iROC);
-//		phROC_hitMap_local_1cl[iROC] = new TH2F(hist_name_pulse_height_hitMap_local_1cl,hist_title_pulse_height_hitMap_local_1cl,divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
-//		phROC_hitMap_local_1cl[iROC]->GetXaxis()->SetTitle("x (mm)");
-//		phROC_hitMap_local_1cl[iROC]->GetYaxis()->SetTitle("y (mm)");
-//		phROC_hitMap_local_1cl[iROC]->SetContour(contour2D);
-//		phROC_hitMap_local_1cl[iROC]->SetMinimum(0);
-
+		TString hist_name_pulse_height_hitMap_telescope_1cl = TString::Format("ph_ROC%d_hitMap_telescope_1cl",iROC);
+		TString hist_title_pulse_height_hitMap_telescope_1cl = TString::Format("Pulse Height ROC%d Hit Map telescope Coord. 1pix cluster",iROC);
+		phROC_hitMap_telescope_1cl[iROC] = new TH2F(hist_name_pulse_height_hitMap_telescope_1cl,hist_title_pulse_height_hitMap_telescope_1cl,divXR1,xminR1,xmaxR1,divYR1,yminR1,ymaxR1);
+		phROC_hitMap_telescope_1cl[iROC]->GetXaxis()->SetTitle("x (mm)");
+		phROC_hitMap_telescope_1cl[iROC]->GetYaxis()->SetTitle("y (mm)");
+		phROC_hitMap_telescope_1cl[iROC]->SetContour(contour2D);
+		phROC_hitMap_telescope_1cl[iROC]->SetMinimum(0);
+		// ROC
 		TString hist_name_pulse_height_pix_1cl = TString::Format("avPh_ROC%d_pix_1cl",iROC);
 		TString hist_title_pulse_height_pix_1cl = TString::Format("Average Pulse Height ROC%d pixelated Coord. 1pix cluster",iROC);
 		avPhROC_pix_1cl[iROC] = new TH2F(hist_name_pulse_height_pix_1cl,hist_title_pulse_height_pix_1cl,numBinCol,minCol-0.5,maxCol+0.5,numBinRow,minRow-0.5,maxRow+0.5);
@@ -331,8 +349,6 @@ void Prueba(char *rootFilePath,char *outputPath){
 		phROC_hitMap_pix_1cl[iROC]->SetMinimum(0);
 	}
 
-	Double_t tempADC = 0;
-
 	cout << "Reading first entry." << endl;
 
 	for(Long64_t i = 0; i < numEntries; i++){
@@ -341,8 +357,9 @@ void Prueba(char *rootFilePath,char *outputPath){
 		numCol = col->size();
 		numRow = row->size();
 		numADC = adc->size();
-
+		coincidenceMap->Fill(coincidence_map);
 		if(numPlane & numCol & numRow == numADC){
+
 			for(Int_t j = 0; j < numPlane; j++){
 				if(plane->at(j)==0){
 					hitMap[0]->Fill(col->at(j),row->at(j));
@@ -373,10 +390,11 @@ void Prueba(char *rootFilePath,char *outputPath){
 		}
 
 		for(Int_t iROC = 0; iROC < 7; iROC++){
-			numCLROC[iROC] = (Int_t)clust_per_plane->at(iROC);
-			Ph1DHistogramsExtraction(numCLROC[iROC], ph_1cl[iROC], ph_2cl[iROC], ph_3cl[iROC], ph_M4cl[iROC], phROC_all[iROC], phROC_1cl[iROC], phROC_2cl[iROC], phROC_3cl[iROC], phROC_M4cl[iROC]);
-//			Ph2DHistogramExtraction(numCLROC[iROC], ph_1cl[iROC], clust_Local_X[iROC],clust_Local_Y[iROC],avPhROC_local_1cl[iROC],phROC_hitMap_local_1cl[iROC],deltaXR1,deltaYR1,kFALSE);
-			Ph2DHistogramExtraction(numCLROC[iROC], ph_1cl[iROC], clust_col[iROC],clust_row[iROC],avPhROC_pix_1cl[iROC],phROC_hitMap_pix_1cl[iROC],1,1,kTRUE);
+			Int_t numClusters = (Int_t)clust_per_plane->at(iROC);
+			Ph1DHistogramsExtraction(numClusters, ph_1cl[iROC], ph_2cl[iROC], ph_3cl[iROC], ph_M4cl[iROC], phROC_all[iROC], phROC_1cl[iROC], phROC_2cl[iROC], phROC_3cl[iROC], phROC_M4cl[iROC]);
+			Ph2DHistogramExtraction(numClusters, ph_1cl[iROC], clust_Local_X[iROC],clust_Local_Y[iROC],avPhROC_local_1cl[iROC],phROC_hitMap_local_1cl[iROC],deltaXR1,deltaYR1,kFALSE);
+			Ph2DHistogramExtraction(numClusters, ph_1cl[iROC], clust_Telescope_X[iROC], clust_Telescope_Y[iROC], avPhROC_telescope_1cl[iROC], phROC_hitMap_telescope_1cl[iROC],deltaXR1, deltaYR1, kFALSE);
+			Ph2DHistogramExtraction(numClusters, ph_1cl[iROC], clust_col[iROC],clust_row[iROC],avPhROC_pix_1cl[iROC],phROC_hitMap_pix_1cl[iROC],1,1,kTRUE);
 		}
 		Float_t progress;
 		if(i == 0) cout << endl;
@@ -390,14 +408,22 @@ void Prueba(char *rootFilePath,char *outputPath){
 	}
 
 	// average for PH DUT
-//	FindAverageHistogramDUT(avPhROC_local_1cl[4],phROC_hitMap_local_1cl[4],avPhROC_local_1cl[5],phROC_hitMap_local_1cl[5],avPhROC_local_1cl[6],phROC_hitMap_local_1cl[6],divXR1,divYR1);
+	FindAverageHistogramDUT(avPhROC_local_1cl[4],phROC_hitMap_local_1cl[4],avPhROC_local_1cl[5],phROC_hitMap_local_1cl[5],avPhROC_local_1cl[6],phROC_hitMap_local_1cl[6],divXR1,divYR1);
+	FindAverageHistogramDUT(avPhROC_telescope_1cl[4],phROC_hitMap_telescope_1cl[4],avPhROC_telescope_1cl[5],phROC_hitMap_telescope_1cl[5],avPhROC_telescope_1cl[6],phROC_hitMap_telescope_1cl[6],divXR1,divYR1);
 	FindAverageHistogramDUT(avPhROC_pix_1cl[4],phROC_hitMap_pix_1cl[4],avPhROC_pix_1cl[5],phROC_hitMap_pix_1cl[5],avPhROC_pix_1cl[6],phROC_hitMap_pix_1cl[6],numBinCol,numBinRow);
 
 	//average for PH Telescope Planes
-//	FindAverageHistogramTPlanes(avPhROC_local_1cl[0],phROC_hitMap_local_1cl[0],avPhROC_local_1cl[1],phROC_hitMap_local_1cl[1],avPhROC_local_1cl[2],phROC_hitMap_local_1cl[2],avPhROC_local_1cl[3],phROC_hitMap_local_1cl[3],divXR1,divYR1);
+	FindAverageHistogramTPlanes(avPhROC_local_1cl[0],phROC_hitMap_local_1cl[0],avPhROC_local_1cl[1],phROC_hitMap_local_1cl[1],avPhROC_local_1cl[2],phROC_hitMap_local_1cl[2],avPhROC_local_1cl[3],phROC_hitMap_local_1cl[3],divXR1,divYR1);
+	FindAverageHistogramTPlanes(avPhROC_telescope_1cl[0],phROC_hitMap_telescope_1cl[0],avPhROC_telescope_1cl[1],phROC_hitMap_telescope_1cl[1],avPhROC_telescope_1cl[2],phROC_hitMap_telescope_1cl[2],avPhROC_telescope_1cl[3],phROC_hitMap_telescope_1cl[3],divXR1,divYR1);
 	FindAverageHistogramTPlanes(avPhROC_pix_1cl[0],phROC_hitMap_pix_1cl[0],avPhROC_pix_1cl[1],phROC_hitMap_pix_1cl[1],avPhROC_pix_1cl[2],phROC_hitMap_pix_1cl[2],avPhROC_pix_1cl[3],phROC_hitMap_pix_1cl[3],numBinCol,numBinRow);
 
 	// Plot
+	TCanvas *c0 = new TCanvas("c0","Coincidence Map",1);
+	c0->cd();
+	coincidenceMap->Draw("hist");
+	c0->SaveAs(Form("%sCoincidenceMap.png",outputPath));
+	delete c0;
+
 	for(Int_t iROC=0;iROC<7;iROC++){
 		if(iROC==4){
 			// Histograms
@@ -405,9 +431,12 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString canvas_name_HitMapD1("Hit Map ROC4 Diamond 1");
 			TString image_name_HitMapD1("HitMapROC4D1.png");
 			PlotHistogram2D(hitMap[iROC],canvas_name_HitMapD1,outputPath,image_name_HitMapD1);
-//			TString canvas_name_avPHD1_local("Average PH ROC4 Diamond 1 Local Coord.");
-//			TString image_name_avPHD1_local("AvPHROC4D1Local.png");
-//			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHD1_local,outputPath,image_name_avPHD1_local);
+			TString canvas_name_avPHD1_local("Average PH ROC4 Diamond 1 Local Coord.");
+			TString image_name_avPHD1_local("AvPHROC4D1Local.png");
+			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHD1_local,outputPath,image_name_avPHD1_local);
+			TString canvas_name_avPHD1_telescope("Average PH ROC4 Diamond 1 telescope Coord.");
+			TString image_name_avPHD1_telescope("AvPHROC4D1telescope.png");
+			PlotHistogram2D(avPhROC_telescope_1cl[iROC],canvas_name_avPHD1_telescope,outputPath,image_name_avPHD1_telescope);
 			TString canvas_name_avPHD1_pix("Average PH ROC4 Diamond 1 Pixelated Coord.");
 			TString image_name_avPHD1_pix("AvPHROC4D1Pix.png");
 			PlotHistogram2D(avPhROC_pix_1cl[iROC],canvas_name_avPHD1_pix,outputPath,image_name_avPHD1_pix);
@@ -421,9 +450,12 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString canvas_name_HitMapD2("Hit Map ROC5 Diamond 2");
 			TString image_name_HitMapD2("HitMapROC5D2.png");
 			PlotHistogram2D(hitMap[iROC],canvas_name_HitMapD2,outputPath,image_name_HitMapD2);
-//			TString canvas_name_avPHD2_local("Average PH ROC5 Diamond 2 Local Coord.");
-//			TString image_name_avPHD2_local("AvPHROC5D2Local.png");
-//			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHD2_local,outputPath,image_name_avPHD2_local);
+			TString canvas_name_avPHD2_local("Average PH ROC5 Diamond 2 Local Coord.");
+			TString image_name_avPHD2_local("AvPHROC5D2Local.png");
+			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHD2_local,outputPath,image_name_avPHD2_local);
+			TString canvas_name_avPHD2_telescope("Average PH ROC5 Diamond 2 telescope Coord.");
+			TString image_name_avPHD2_telescope("AvPHROC5D2telescope.png");
+			PlotHistogram2D(avPhROC_telescope_1cl[iROC],canvas_name_avPHD2_telescope,outputPath,image_name_avPHD2_telescope);
 			TString canvas_name_avPHD2_pix("Average PH ROC5 Diamond 2 Pixelated Coord.");
 			TString image_name_avPHD2_pix("AvPHROC5D2Pix.png");
 			PlotHistogram2D(avPhROC_pix_1cl[iROC],canvas_name_avPHD2_pix,outputPath,image_name_avPHD2_pix);
@@ -437,9 +469,12 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString canvas_name_HitMapSi("Hit Map ROC6 Silicon");
 			TString image_name_HitMapSi("HitMapROC6Si.png");
 			PlotHistogram2D(hitMap[iROC],canvas_name_HitMapSi,outputPath,image_name_HitMapSi);
-//			TString canvas_name_avPHSi_local("Average PH ROC6 Silicon Local Coord.");
-//			TString image_name_avPHSi_local("AvPHROC6SiLocal.png");
-//			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHSi_local,outputPath,image_name_avPHSi_local);
+			TString canvas_name_avPHSi_local("Average PH ROC6 Silicon Local Coord.");
+			TString image_name_avPHSi_local("AvPHROC6SiLocal.png");
+			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPHSi_local,outputPath,image_name_avPHSi_local);
+			TString canvas_name_avPHSi_telescope("Average PH ROC6 Silicon telescope Coord.");
+			TString image_name_avPHSi_telescope("AvPHROC6Sitelescope.png");
+			PlotHistogram2D(avPhROC_telescope_1cl[iROC],canvas_name_avPHSi_telescope,outputPath,image_name_avPHSi_telescope);
 			TString canvas_name_avPHSi_pix("Average PH ROC6 Silicon Pixelated Coord.");
 			TString image_name_avPHSi_pix("AvPHROC6SiPix.png");
 			PlotHistogram2D(avPhROC_pix_1cl[iROC],canvas_name_avPHSi_pix,outputPath,image_name_avPHSi_pix);
@@ -453,9 +488,12 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString canvas_name_HitMap = TString::Format("Hit Map ROC%d",iROC);
 			TString image_name_HitMap = TString::Format("HitMapROC%d.png",iROC);
 			PlotHistogram2D(hitMap[iROC],canvas_name_HitMap,outputPath,image_name_HitMap);
-//			TString canvas_name_avPH_local = TString::Format("Average PH ROC%d Local Coord.",iROC);
-//			TString image_name_avPH_local = TString::Format("AvPHROC%dLocal.png",iROC);
-//			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPH_local,outputPath,image_name_avPH_local);
+			TString canvas_name_avPH_local = TString::Format("Average PH ROC%d Local Coord.",iROC);
+			TString image_name_avPH_local = TString::Format("AvPHROC%dLocal.png",iROC);
+			PlotHistogram2D(avPhROC_local_1cl[iROC],canvas_name_avPH_local,outputPath,image_name_avPH_local);
+			TString canvas_name_avPH_telescope = TString::Format("Average PH ROC%d telescope Coord.",iROC);
+			TString image_name_avPH_telescope = TString::Format("AvPHROC%dtelescope.png",iROC);
+			PlotHistogram2D(avPhROC_telescope_1cl[iROC],canvas_name_avPH_telescope,outputPath,image_name_avPH_telescope);
 			TString canvas_name_avPH_pix = TString::Format("Average PH ROC%d Pixelated Coord.",iROC);
 			TString image_name_avPH_pix = TString::Format("AvPHROC%dPix.png",iROC);
 			PlotHistogram2D(avPhROC_pix_1cl[iROC],canvas_name_avPH_pix,outputPath,image_name_avPH_pix);
@@ -468,9 +506,10 @@ void Prueba(char *rootFilePath,char *outputPath){
 
 	// Save histograms
 	TFile f(Form("%s%s",outputPath,histogramOutputFile),"RECREATE");
+	coincidenceMap->Write();
 	for(Int_t iROC = 0; iROC<7;iROC++){
 		hitMap[iROC]->Write();
-//		avPhROC_local_1cl[iROC]->Write();
+		avPhROC_local_1cl[iROC]->Write();
 		avPhROC_pix_1cl[iROC]->Write();
 		phROC_all[iROC]->Write();
 		phROC_1cl[iROC]->Write();
@@ -481,6 +520,10 @@ void Prueba(char *rootFilePath,char *outputPath){
 
 	f.Close();
 
+
+}
+
+void DoAveragePulseHeight(int numCl, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TGraphErrors *phGall, TGraphErrors *phG1, TGraphErrors *phG2, TGraphErrors *phG3, TGraphErrors *phGM4){
 
 }
 
@@ -536,19 +579,26 @@ void Ph2DHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *
 }
 
 void PlotPulseHeightsOverlay(TH1F *phall, TH1F *ph1, TH1F *ph2, TH1F *ph3, TH1F *phM4, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix){
+	gStyle->SetOptStat(0);
 	TCanvas *c1 = new TCanvas("c1",title,1);
 	c1->cd();
 	if(logX) {c1->SetLogx();}
 	if(logY) {c1->SetLogy();}
-	phall->Draw("hist");
+	phall->Draw("p e0");
+	phall->Draw("hist same");
+	ph1->Draw("p e0 same");
 	ph1->Draw("hist same");
+	ph2->Draw("p e0 same");
 	ph2->Draw("hist same");
+	ph3->Draw("p e0 same");
 	ph3->Draw("hist same");
+	phM4->Draw("p e0 same");
 	phM4->Draw("hist same");
 	c1->SaveAs(Form("%s%s",outputPath,suffix));
 }
 
 void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath, const char *suffix){
+	gStyle->SetOptStat(0);
 	TCanvas *c1 = new TCanvas("c1",title,1);
 	c1->cd();
 	histogram->Draw("COLZ");
