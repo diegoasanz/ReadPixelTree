@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <stdlib.h>
 #include <stdint.h>
+#include <tgmath.h>
 
 using namespace std;
 #include "TFile.h"
@@ -40,10 +41,13 @@ using namespace std;
 #include "TChain.h"
 #include "TGraphErrors.h"
 #include "TStyle.h"
+#include "TMultiGraph.h"
 
 void Prueba(char *rootFilePath, char *outputPath);
 
 TChain * ReadPixRootFile(const char *fileName);
+
+void DoAveragePulseHeight(Long64_t ievent, int numCl, Int_t iROC, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TGraphErrors *phGall, TGraphErrors *phG1, TGraphErrors *phG2, TGraphErrors *phG3, TGraphErrors *phGM4);
 
 void Ph1DHistogramsExtraction(int numCLROC, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TH1F *phHall, TH1F *phH1, TH1F *phH2, TH1F *phH3, TH1F *phHM4);
 
@@ -53,9 +57,11 @@ void PlotPulseHeightsOverlay(TH1F *phall, TH1F *ph1, TH1F *ph2, TH1F *ph3, TH1F 
 
 void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath, const char *suffix);
 
-void FindAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histToAvDUT2, TH2F *histHitsDUT2, TH2F *histToAvDUT3, TH2F *histHitsDUT3, Int_t xbins, Int_t ybins);
+void PlotTgraphsOverlay(TGraphErrors *gall, TGraphErrors *g1, TGraphErrors *g2, TGraphErrors *g3, TGraphErrors *gM4, const char *title, const char *outputPath, const char *suffix);
 
-void FindAverageHistogramTPlanes(TH2F *histToAvTPlane0, TH2F *histHitsTPlane0, TH2F *histToAvTPlane1, TH2F *histHitsTPlane1, TH2F *histToAvTPlane2, TH2F *histHitsTPlane2, TH2F *histToAvTPlane3, TH2F *histHitsTPlane3, Int_t xbins, Int_t ybins);
+void DoAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histToAvDUT2, TH2F *histHitsDUT2, TH2F *histToAvDUT3, TH2F *histHitsDUT3, Int_t xbins, Int_t ybins);
+
+void DoAverageHistogramTPlanes(TH2F *histToAvTPlane0, TH2F *histHitsTPlane0, TH2F *histToAvTPlane1, TH2F *histHitsTPlane1, TH2F *histToAvTPlane2, TH2F *histHitsTPlane2, TH2F *histToAvTPlane3, TH2F *histHitsTPlane3, Int_t xbins, Int_t ybins);
 
 void AverageBinHistogram(TH2F *histToAv, TH2F *histHits, Int_t binx, Int_t biny);
 
@@ -75,10 +81,14 @@ const string maskFile = "~/Dropbox/201601/DiamondPixels/ReadPixelTree/maskFile.m
 
 vector<int> *mskdroc = 0, *mskdcol = 0, *mskdrow = 0;
 
-Int_t contour2D = 1024, mean1Dbins = 100, numBinCol = 52, numBinRow = 80, minCol = 0, maxCol = 51, minRow = 0, maxRow = 79, binWidthTGraph=2000;
+Int_t contour2D = 1024, mean1Dbins = 100, numBinCol = 52, numBinRow = 80, minCol = 0, maxCol = 51, minRow = 0, maxRow = 79;
 Float_t xminR1 = -6.075, xmaxR1 = 6.075, yminR1 = -6.05, ymaxR1 = 6.05, ph1Dmin=0, ph1Dmax=50000;
 Int_t divXR1 = 81, divYR1 = 121, ph1Dbins=100;
 Float_t deltaXR1 = (Float_t)((xmaxR1-xminR1)/divXR1), deltaYR1 = (Float_t)((ymaxR1-yminR1)/divYR1);
+Double_t  binWidthTGraph=2000;
+vector<vector<int>> nAverage;
+vector<vector<float>> valueAverage;
+Int_t nPointsTGraph = 0;
 
 int main() {
 	gROOT->ProcessLine("#include <vector>");
@@ -133,6 +143,17 @@ void Prueba(char *rootFilePath,char *outputPath){
 	ph_3cl.resize(7);
 	ph_M4cl.resize(7);
 
+	nAverage.resize(7);
+	valueAverage.resize(7);
+	for(Int_t iROC = 0; iROC < 7; iROC++){
+		nAverage[iROC].resize(5);
+		valueAverage[iROC].resize(5);
+		for(Int_t k=0; k< 5; k++){
+			nAverage[iROC][k]=0;
+			valueAverage[iROC][k]=0;
+		}
+	}
+
 	chain1->SetBranchAddress("event_number",&event_number);
 	chain1->SetBranchAddress("time",&time);
 	chain1->SetBranchAddress("plane",&plane);
@@ -177,6 +198,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 		chain1->SetBranchAddress(branch_name_pulse_height_3pix_cluster,&(ph_3cl[iROC]));
 		TString branch_name_pulse_height_M4pix_cluster = TString::Format("pulse_height_ROC%d_More4_cluster",iROC);
 		chain1->SetBranchAddress(branch_name_pulse_height_M4pix_cluster,&(ph_M4cl[iROC]));
+		// initialize vectors in 0
 	}
 
 
@@ -188,6 +210,22 @@ void Prueba(char *rootFilePath,char *outputPath){
 	TGraphErrors *meanPhROC_all[7], *meanPhROC_1cl[7], *meanPhROC_2cl[7], *meanPhROC_3cl[7], *meanPhROC_M4cl[7];
 	TH2F *hitMap[7], *avPhROC_local_1cl[7], *phROC_hitMap_local_1cl[7], *avPhROC_pix_1cl[7], *phROC_hitMap_pix_1cl[7], *avPhROC_telescope_1cl[7], *phROC_hitMap_telescope_1cl[7];
 	for(Int_t iROC = 0; iROC<7; iROC++){
+		// 1D TGraphErrors
+		meanPhROC_all[iROC] = new TGraphErrors();
+		meanPhROC_all[iROC]->SetLineColor(1); // black
+		meanPhROC_all[iROC]->SetMarkerColor(1); // black
+		meanPhROC_1cl[iROC] = new TGraphErrors();
+		meanPhROC_1cl[iROC]->SetLineColor(4); // blue
+		meanPhROC_1cl[iROC]->SetMarkerColor(4); // blue
+		meanPhROC_2cl[iROC] = new TGraphErrors();
+		meanPhROC_2cl[iROC]->SetLineColor(3); // green
+		meanPhROC_2cl[iROC]->SetMarkerColor(3); // green
+		meanPhROC_3cl[iROC] = new TGraphErrors();
+		meanPhROC_3cl[iROC]->SetLineColor(2); // red
+		meanPhROC_3cl[iROC]->SetMarkerColor(2); // red
+		meanPhROC_M4cl[iROC] = new TGraphErrors();
+		meanPhROC_M4cl[iROC]->SetLineColor(6); // magenta
+		meanPhROC_M4cl[iROC]->SetMarkerColor(6); // magenta
 		// 1D Histograms Draw with ape and same
 		TString hist_name_pulse_height_all = TString::Format("phROC%d_all",iROC);
 		TString hist_title_pulse_height_all = TString::Format("Pulse Height ROC%d all cluster",iROC);
@@ -395,6 +433,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 			Ph2DHistogramExtraction(numClusters, ph_1cl[iROC], clust_Local_X[iROC],clust_Local_Y[iROC],avPhROC_local_1cl[iROC],phROC_hitMap_local_1cl[iROC],deltaXR1,deltaYR1,kFALSE);
 			Ph2DHistogramExtraction(numClusters, ph_1cl[iROC], clust_Telescope_X[iROC], clust_Telescope_Y[iROC], avPhROC_telescope_1cl[iROC], phROC_hitMap_telescope_1cl[iROC],deltaXR1, deltaYR1, kFALSE);
 			Ph2DHistogramExtraction(numClusters, ph_1cl[iROC], clust_col[iROC],clust_row[iROC],avPhROC_pix_1cl[iROC],phROC_hitMap_pix_1cl[iROC],1,1,kTRUE);
+			DoAveragePulseHeight(i, numClusters, iROC, ph_1cl[iROC], ph_2cl[iROC], ph_3cl[iROC], ph_M4cl[iROC], meanPhROC_all[iROC], meanPhROC_1cl[iROC], meanPhROC_2cl[iROC], meanPhROC_3cl[iROC], meanPhROC_M4cl[iROC]);
 		}
 		Float_t progress;
 		if(i == 0) cout << endl;
@@ -408,14 +447,14 @@ void Prueba(char *rootFilePath,char *outputPath){
 	}
 
 	// average for PH DUT
-	FindAverageHistogramDUT(avPhROC_local_1cl[4],phROC_hitMap_local_1cl[4],avPhROC_local_1cl[5],phROC_hitMap_local_1cl[5],avPhROC_local_1cl[6],phROC_hitMap_local_1cl[6],divXR1,divYR1);
-	FindAverageHistogramDUT(avPhROC_telescope_1cl[4],phROC_hitMap_telescope_1cl[4],avPhROC_telescope_1cl[5],phROC_hitMap_telescope_1cl[5],avPhROC_telescope_1cl[6],phROC_hitMap_telescope_1cl[6],divXR1,divYR1);
-	FindAverageHistogramDUT(avPhROC_pix_1cl[4],phROC_hitMap_pix_1cl[4],avPhROC_pix_1cl[5],phROC_hitMap_pix_1cl[5],avPhROC_pix_1cl[6],phROC_hitMap_pix_1cl[6],numBinCol,numBinRow);
+	DoAverageHistogramDUT(avPhROC_local_1cl[4],phROC_hitMap_local_1cl[4],avPhROC_local_1cl[5],phROC_hitMap_local_1cl[5],avPhROC_local_1cl[6],phROC_hitMap_local_1cl[6],divXR1,divYR1);
+	DoAverageHistogramDUT(avPhROC_telescope_1cl[4],phROC_hitMap_telescope_1cl[4],avPhROC_telescope_1cl[5],phROC_hitMap_telescope_1cl[5],avPhROC_telescope_1cl[6],phROC_hitMap_telescope_1cl[6],divXR1,divYR1);
+	DoAverageHistogramDUT(avPhROC_pix_1cl[4],phROC_hitMap_pix_1cl[4],avPhROC_pix_1cl[5],phROC_hitMap_pix_1cl[5],avPhROC_pix_1cl[6],phROC_hitMap_pix_1cl[6],numBinCol,numBinRow);
 
 	//average for PH Telescope Planes
-	FindAverageHistogramTPlanes(avPhROC_local_1cl[0],phROC_hitMap_local_1cl[0],avPhROC_local_1cl[1],phROC_hitMap_local_1cl[1],avPhROC_local_1cl[2],phROC_hitMap_local_1cl[2],avPhROC_local_1cl[3],phROC_hitMap_local_1cl[3],divXR1,divYR1);
-	FindAverageHistogramTPlanes(avPhROC_telescope_1cl[0],phROC_hitMap_telescope_1cl[0],avPhROC_telescope_1cl[1],phROC_hitMap_telescope_1cl[1],avPhROC_telescope_1cl[2],phROC_hitMap_telescope_1cl[2],avPhROC_telescope_1cl[3],phROC_hitMap_telescope_1cl[3],divXR1,divYR1);
-	FindAverageHistogramTPlanes(avPhROC_pix_1cl[0],phROC_hitMap_pix_1cl[0],avPhROC_pix_1cl[1],phROC_hitMap_pix_1cl[1],avPhROC_pix_1cl[2],phROC_hitMap_pix_1cl[2],avPhROC_pix_1cl[3],phROC_hitMap_pix_1cl[3],numBinCol,numBinRow);
+	DoAverageHistogramTPlanes(avPhROC_local_1cl[0],phROC_hitMap_local_1cl[0],avPhROC_local_1cl[1],phROC_hitMap_local_1cl[1],avPhROC_local_1cl[2],phROC_hitMap_local_1cl[2],avPhROC_local_1cl[3],phROC_hitMap_local_1cl[3],divXR1,divYR1);
+	DoAverageHistogramTPlanes(avPhROC_telescope_1cl[0],phROC_hitMap_telescope_1cl[0],avPhROC_telescope_1cl[1],phROC_hitMap_telescope_1cl[1],avPhROC_telescope_1cl[2],phROC_hitMap_telescope_1cl[2],avPhROC_telescope_1cl[3],phROC_hitMap_telescope_1cl[3],divXR1,divYR1);
+	DoAverageHistogramTPlanes(avPhROC_pix_1cl[0],phROC_hitMap_pix_1cl[0],avPhROC_pix_1cl[1],phROC_hitMap_pix_1cl[1],avPhROC_pix_1cl[2],phROC_hitMap_pix_1cl[2],avPhROC_pix_1cl[3],phROC_hitMap_pix_1cl[3],numBinCol,numBinRow);
 
 	// Plot
 	TCanvas *c0 = new TCanvas("c0","Coincidence Map",1);
@@ -444,6 +483,10 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString canvas_name_phD1("Pulse Height ROC4 Diamond 1");
 			TString image_name_phD1("PhROC4D1.png");
 			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phD1,outputPath,image_name_phD1);
+			// TGraphErrors
+			TString canvas_name_phMeanD1("Pulse Height ROC 4 Diamond 1");
+			TString image_name_phMeanD1("PhMeanROC4D1.png");
+			PlotTgraphsOverlay(meanPhROC_all[iROC],meanPhROC_1cl[iROC],meanPhROC_2cl[iROC],meanPhROC_3cl[iROC],meanPhROC_M4cl[iROC],canvas_name_phMeanD1,outputPath,image_name_phMeanD1);
 		}
 		else if(iROC == 5){
 			// 2D
@@ -463,6 +506,10 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString canvas_name_phD2("Pulse Height ROC5 Diamond 2");
 			TString image_name_phD2("PhROC5D2.png");
 			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phD2,outputPath,image_name_phD2);
+			// TGraphErrors
+			TString canvas_name_phMeanD2("Pulse Height ROC 5 Diamond 2");
+			TString image_name_phMeanD2("PhMeanROC5D2.png");
+			PlotTgraphsOverlay(meanPhROC_all[iROC],meanPhROC_1cl[iROC],meanPhROC_2cl[iROC],meanPhROC_3cl[iROC],meanPhROC_M4cl[iROC],canvas_name_phMeanD2,outputPath,image_name_phMeanD2);
 		}
 		else if(iROC == 6){
 			// 2D
@@ -481,7 +528,11 @@ void Prueba(char *rootFilePath,char *outputPath){
 			// 1D
 			TString canvas_name_phSi("Pulse Height ROC6 Silicon");
 			TString image_name_phSi("PhROC6Si.png");
-			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phSi,outputPath,image_name_phSi);
+			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phSi,outputPath,image_name_phSi);// TGraphErrors
+			// TGraphErrors
+			TString canvas_name_phMeanSi("Pulse Height ROC 6 Silicon");
+			TString image_name_phMeanSi("PhMeanROC6Si.png");
+			PlotTgraphsOverlay(meanPhROC_all[iROC],meanPhROC_1cl[iROC],meanPhROC_2cl[iROC],meanPhROC_3cl[iROC],meanPhROC_M4cl[iROC],canvas_name_phMeanSi,outputPath,image_name_phMeanSi);
 		}
 		else{
 			// 2D
@@ -501,6 +552,10 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString canvas_name_ph(Form("Pulse Height ROC%d",iROC));
 			TString image_name_ph(Form("PhROC%d.png",iROC));
 			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_ph,outputPath,image_name_ph);
+			// TGraphErrors
+			TString canvas_name_phMean(Form("Pulse Height ROC%d",iROC));
+			TString image_name_phMean(Form("PhMeanROC%d.png",iROC));
+			PlotTgraphsOverlay(meanPhROC_all[iROC],meanPhROC_1cl[iROC],meanPhROC_2cl[iROC],meanPhROC_3cl[iROC],meanPhROC_M4cl[iROC],canvas_name_phMean,outputPath,image_name_phMean);
 		}
 	}
 
@@ -523,8 +578,62 @@ void Prueba(char *rootFilePath,char *outputPath){
 
 }
 
-void DoAveragePulseHeight(int numCl, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TGraphErrors *phGall, TGraphErrors *phG1, TGraphErrors *phG2, TGraphErrors *phG3, TGraphErrors *phGM4){
-
+void DoAveragePulseHeight(Long64_t ievent, int numCl, Int_t iROC, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TGraphErrors *phGall, TGraphErrors *phG1, TGraphErrors *phG2, TGraphErrors *phG3, TGraphErrors *phGM4){
+	if(ievent - (nPointsTGraph*binWidthTGraph) > binWidthTGraph){
+		phGall->Set((Int_t)nPointsTGraph+1);
+		phGall->SetPoint((Int_t)nPointsTGraph,ievent-binWidthTGraph/2,valueAverage[iROC][0]);
+		phGall->SetPointError((Int_t)nPointsTGraph,binWidthTGraph/2,valueAverage[iROC][0]/sqrt(nAverage[iROC][0]));
+		nAverage[iROC][0]=0;
+		valueAverage[iROC][0]=0;
+		phG1->Set((Int_t)nPointsTGraph+1);
+		phG1->SetPoint((Int_t)nPointsTGraph,ievent-binWidthTGraph/2,valueAverage[iROC][1]);
+		phG1->SetPointError((Int_t)nPointsTGraph,binWidthTGraph/2,valueAverage[iROC][1]/sqrt(nAverage[iROC][1]));
+		nAverage[iROC][1]=0;
+		valueAverage[iROC][1]=0;
+		phG2->Set((Int_t)nPointsTGraph+1);
+		phG2->SetPoint((Int_t)nPointsTGraph,ievent-binWidthTGraph/2,valueAverage[iROC][2]);
+		phG2->SetPointError((Int_t)nPointsTGraph,binWidthTGraph/2,valueAverage[iROC][2]/sqrt(nAverage[iROC][2]));
+		nAverage[iROC][2]=0;
+		valueAverage[iROC][2]=0;
+		phG3->Set((Int_t)nPointsTGraph+1);
+		phG3->SetPoint((Int_t)nPointsTGraph,ievent-binWidthTGraph/2,valueAverage[iROC][3]);
+		phG3->SetPointError((Int_t)nPointsTGraph,binWidthTGraph/2,valueAverage[iROC][3]/sqrt(nAverage[iROC][3]));
+		nAverage[iROC][3]=0;
+		valueAverage[iROC][3]=0;
+		phGM4->Set((Int_t)nPointsTGraph+1);
+		phGM4->SetPoint((Int_t)nPointsTGraph,ievent-binWidthTGraph/2,valueAverage[iROC][4]);
+		phGM4->SetPointError((Int_t)nPointsTGraph,binWidthTGraph/2,valueAverage[iROC][4]/sqrt(nAverage[iROC][4]));
+		nAverage[iROC][4]=0;
+		valueAverage[iROC][4]=0;
+		nPointsTGraph++;
+	}
+	if (numCl != 0){
+		for(Int_t i =0; i< ph1->size(); i++){
+			valueAverage[iROC][0]=valueAverage[iROC][0]*nAverage[iROC][0]/((float)nAverage[iROC][0]+1)+ph1->at(i)/((float)nAverage[iROC][0]+1);
+			nAverage[iROC][0]=nAverage[iROC][0]+1;
+			valueAverage[iROC][1]=valueAverage[iROC][1]*nAverage[iROC][1]/((float)nAverage[iROC][1]+1)+ph1->at(i)/((float)nAverage[iROC][1]+1);
+			nAverage[iROC][1]=nAverage[iROC][1]+1;
+		}
+		for(Int_t i =0; i< ph2->size(); i++){
+			float temp = (valueAverage[iROC][0])*(nAverage[iROC][0])/((float)(nAverage[iROC][0])+1)+(ph1->at(i))/((float)(nAverage[iROC][0])+1);cout << "BLAst" <<endl;
+			valueAverage[iROC][0]=temp;cout << "BLA" <<endl;
+			nAverage[iROC][0]=nAverage[iROC][0]+1;cout << "BLA" <<endl;
+			valueAverage[iROC][2]=valueAverage[iROC][2]*nAverage[iROC][2]/((float)nAverage[iROC][2]+1)+ph1->at(i)/((float)nAverage[iROC][2]+1);cout << "BLA" <<endl;
+			nAverage[iROC][2]=nAverage[iROC][2]+1;cout << "BLA" <<endl;
+		}
+		for(Int_t i =0; i< ph3->size(); i++){
+			valueAverage[iROC][0]=valueAverage[iROC][0]*nAverage[iROC][0]/((float)nAverage[iROC][0]+1)+ph1->at(i)/((float)nAverage[iROC][0]+1);
+			nAverage[iROC][0]=nAverage[iROC][0]+1;
+			valueAverage[iROC][3]=valueAverage[iROC][3]*nAverage[iROC][3]/((float)nAverage[iROC][3]+1)+ph1->at(i)/((float)nAverage[iROC][3]+1);
+			nAverage[iROC][3]=nAverage[iROC][3]+1;
+		}
+		for(Int_t i =0; i< phM4->size(); i++){
+			valueAverage[iROC][0]=valueAverage[iROC][0]*nAverage[iROC][0]/((float)nAverage[iROC][0]+1)+phM4->at(i)/((float)nAverage[iROC][0]+1);
+			nAverage[iROC][0]=nAverage[iROC][0]+1;
+			valueAverage[iROC][4]=valueAverage[iROC][4]*nAverage[iROC][4]/((float)nAverage[iROC][4]+1)+phM4->at(i)/((float)nAverage[iROC][4]+1);
+			nAverage[iROC][4]=nAverage[iROC][4]+1;
+		}
+	}
 }
 
 void Ph1DHistogramsExtraction(int numCLROC, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TH1F *phHall, TH1F *phH1, TH1F *phH2, TH1F *phH3, TH1F *phHM4){
@@ -578,6 +687,21 @@ void Ph2DHistogramExtraction(int numCLROC, vector<float> *phROC, vector<float> *
 	}
 }
 
+void PlotTgraphsOverlay(TGraphErrors *gall, TGraphErrors *g1, TGraphErrors *g2, TGraphErrors *g3, TGraphErrors *gM4, const char *title, const char *outputPath, const char *suffix){
+	gStyle->SetOptStat(0);
+	TCanvas *c1 = new TCanvas("c1",title,1);
+	c1->cd();
+	TMultiGraph *mg = new TMultiGraph();
+	mg->SetTitle(title);
+	mg->Add(gall);
+	mg->Add(g1);
+	mg->Add(g2);
+	mg->Add(g3);
+	mg->Add(gM4);
+	mg->Draw("ALP");
+	c1->SaveAs(Form("%s%s",outputPath,suffix));
+}
+
 void PlotPulseHeightsOverlay(TH1F *phall, TH1F *ph1, TH1F *ph2, TH1F *ph3, TH1F *phM4, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix){
 	gStyle->SetOptStat(0);
 	TCanvas *c1 = new TCanvas("c1",title,1);
@@ -606,7 +730,7 @@ void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath,
 	delete c1;
 }
 
-void FindAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histToAvDUT2, TH2F *histHitsDUT2, TH2F *histToAvDUT3, TH2F *histHitsDUT3, Int_t xbins, Int_t ybins){
+void DoAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histToAvDUT2, TH2F *histHitsDUT2, TH2F *histToAvDUT3, TH2F *histHitsDUT3, Int_t xbins, Int_t ybins){
 	for (Int_t i = 1; i <= xbins; i++){
 		for (Int_t j = 1; j <= ybins; j++){
 			if(histHitsDUT1->GetBinContent(i,j) >= 1){
@@ -622,7 +746,7 @@ void FindAverageHistogramDUT(TH2F *histToAvDUT1, TH2F *histHitsDUT1, TH2F *histT
 	}
 }
 
-void FindAverageHistogramTPlanes(TH2F *histToAvTPlane0, TH2F *histHitsTPlane0, TH2F *histToAvTPlane1, TH2F *histHitsTPlane1, TH2F *histToAvTPlane2, TH2F *histHitsTPlane2, TH2F *histToAvTPlane3, TH2F *histHitsTPlane3, Int_t xbins, Int_t ybins){
+void DoAverageHistogramTPlanes(TH2F *histToAvTPlane0, TH2F *histHitsTPlane0, TH2F *histToAvTPlane1, TH2F *histHitsTPlane1, TH2F *histToAvTPlane2, TH2F *histHitsTPlane2, TH2F *histToAvTPlane3, TH2F *histHitsTPlane3, Int_t xbins, Int_t ybins){
 	for (Int_t i = 1; i <= xbins; i++){
 		for (Int_t j = 1; j <= ybins; j++){
 			if(histHitsTPlane0->GetBinContent(i,j) >= 1){
