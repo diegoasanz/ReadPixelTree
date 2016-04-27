@@ -86,8 +86,8 @@ Float_t xminR1 = -6.075, xmaxR1 = 6.075, yminR1 = -6.05, ymaxR1 = 6.05, ph1Dmin=
 Int_t divXR1 = 81, divYR1 = 121, ph1Dbins=100;
 Float_t deltaXR1 = (Float_t)((xmaxR1-xminR1)/divXR1), deltaYR1 = (Float_t)((ymaxR1-yminR1)/divYR1);
 Double_t  binWidthTGraph=2000;
-vector<vector<int>> nAverage;
-vector<vector<float>> valueAverage;
+vector<vector<int>> nAverage(7, vector<int>(5));
+vector<vector<float>> valueAverage(7, vector<float>(5));
 Int_t nPointsTGraph = 0;
 
 int main() {
@@ -142,12 +142,8 @@ void Prueba(char *rootFilePath,char *outputPath){
 	ph_2cl.resize(7);
 	ph_3cl.resize(7);
 	ph_M4cl.resize(7);
-
-	nAverage.resize(7);
-	valueAverage.resize(7);
+	// Start every entry of the vector in 0
 	for(Int_t iROC = 0; iROC < 7; iROC++){
-		nAverage[iROC].resize(5);
-		valueAverage[iROC].resize(5);
 		for(Int_t k=0; k< 5; k++){
 			nAverage[iROC][k]=0;
 			valueAverage[iROC][k]=0;
@@ -212,18 +208,28 @@ void Prueba(char *rootFilePath,char *outputPath){
 	for(Int_t iROC = 0; iROC<7; iROC++){
 		// 1D TGraphErrors
 		meanPhROC_all[iROC] = new TGraphErrors();
+		TString graphTitleall(Form("meanPHROC%d_all",iROC));
+		meanPhROC_all[iROC]->SetNameTitle(graphTitleall,graphTitleall);
 		meanPhROC_all[iROC]->SetLineColor(1); // black
 		meanPhROC_all[iROC]->SetMarkerColor(1); // black
 		meanPhROC_1cl[iROC] = new TGraphErrors();
+		TString graphTitle1cl(Form("meanPHROC%d_1cl",iROC));
+		meanPhROC_1cl[iROC]->SetNameTitle(graphTitle1cl,graphTitle1cl);
 		meanPhROC_1cl[iROC]->SetLineColor(4); // blue
 		meanPhROC_1cl[iROC]->SetMarkerColor(4); // blue
 		meanPhROC_2cl[iROC] = new TGraphErrors();
+		TString graphTitle2cl(Form("meanPHROC%d_2cl",iROC));
+		meanPhROC_2cl[iROC]->SetNameTitle(graphTitle2cl,graphTitle2cl);
 		meanPhROC_2cl[iROC]->SetLineColor(3); // green
 		meanPhROC_2cl[iROC]->SetMarkerColor(3); // green
 		meanPhROC_3cl[iROC] = new TGraphErrors();
+		TString graphTitle3cl(Form("meanPHROC%d_3cl",iROC));
+		meanPhROC_3cl[iROC]->SetNameTitle(graphTitle3cl,graphTitle3cl);
 		meanPhROC_3cl[iROC]->SetLineColor(2); // red
 		meanPhROC_3cl[iROC]->SetMarkerColor(2); // red
 		meanPhROC_M4cl[iROC] = new TGraphErrors();
+		TString graphTitleM4cl(Form("meanPHROC%d_M4cl",iROC));
+		meanPhROC_M4cl[iROC]->SetNameTitle(graphTitleM4cl,graphTitleM4cl);
 		meanPhROC_M4cl[iROC]->SetLineColor(6); // magenta
 		meanPhROC_M4cl[iROC]->SetMarkerColor(6); // magenta
 		// 1D Histograms Draw with ape and same
@@ -267,66 +273,6 @@ void Prueba(char *rootFilePath,char *outputPath){
 		phROC_M4cl[iROC]->SetMaximum(maxphplots);
 		phROC_M4cl[iROC]->SetMinimum(0);
 		phROC_M4cl[iROC]->SetLineColor(6); // magenta
-		// 1D TGraphErrors Draw with hist and samehist
-		meanPhROC_all[iROC] = new TGraphErrors(mean1Dbins);
-		TString tgraph_name_mean_pulse_height_all = TString::Format("meanPHROC%d_all",iROC);
-		TString tgraph_title_mean_pulse_height_all = TString::Format("Mean Pulse Height ROC%d all cluster",iROC);
-		meanPhROC_all[iROC]->SetName(tgraph_name_mean_pulse_height_all);
-		meanPhROC_all[iROC]->SetTitle(tgraph_title_mean_pulse_height_all);
-		meanPhROC_all[iROC]->GetXaxis()->SetTitle("Event Number");
-		meanPhROC_all[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
-		meanPhROC_all[iROC]->SetMinimum(0);
-		meanPhROC_all[iROC]->SetMaximum(numEntries);
-		meanPhROC_all[iROC]->SetLineColor(1); // black
-		meanPhROC_all[iROC]->SetMarkerColor(1); // black
-
-		meanPhROC_1cl[iROC] = new TGraphErrors(mean1Dbins);
-		TString tgraph_name_mean_pulse_height_1cl = TString::Format("meanPHROC%d_1cl",iROC);
-		TString tgraph_title_mean_pulse_height_1cl = TString::Format("Mean Pulse Height ROC%d 1pix cluster",iROC);
-		meanPhROC_1cl[iROC]->SetName(tgraph_name_mean_pulse_height_1cl);
-		meanPhROC_1cl[iROC]->SetTitle(tgraph_title_mean_pulse_height_1cl);
-		meanPhROC_1cl[iROC]->GetXaxis()->SetTitle("Event Number");
-		meanPhROC_1cl[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
-		meanPhROC_1cl[iROC]->SetMinimum(0);
-		meanPhROC_1cl[iROC]->SetMaximum(numEntries);
-		meanPhROC_1cl[iROC]->SetLineColor(4); // blue
-		meanPhROC_1cl[iROC]->SetMarkerColor(4); // blue
-
-		meanPhROC_2cl[iROC] = new TGraphErrors(mean1Dbins);
-		TString tgraph_name_mean_pulse_height_2cl = TString::Format("meanPHROC%d_2cl",iROC);
-		TString tgraph_title_mean_pulse_height_2cl = TString::Format("Mean Pulse Height ROC%d 2pix cluster",iROC);
-		meanPhROC_2cl[iROC]->SetName(tgraph_name_mean_pulse_height_2cl);
-		meanPhROC_2cl[iROC]->SetTitle(tgraph_title_mean_pulse_height_2cl);
-		meanPhROC_2cl[iROC]->GetXaxis()->SetTitle("Event Number");
-		meanPhROC_2cl[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
-		meanPhROC_2cl[iROC]->SetMinimum(0);
-		meanPhROC_2cl[iROC]->SetMaximum(numEntries);
-		meanPhROC_2cl[iROC]->SetLineColor(3); // green
-		meanPhROC_2cl[iROC]->SetMarkerColor(3); // green
-
-		meanPhROC_3cl[iROC] = new TGraphErrors(mean1Dbins);
-		TString tgraph_name_mean_pulse_height_3cl = TString::Format("meanPHROC%d_3cl",iROC);
-		TString tgraph_title_mean_pulse_height_3cl = TString::Format("Mean Pulse Height ROC%d 3pix cluster",iROC);
-		meanPhROC_3cl[iROC]->SetName(tgraph_name_mean_pulse_height_3cl);
-		meanPhROC_3cl[iROC]->SetTitle(tgraph_title_mean_pulse_height_3cl);
-		meanPhROC_3cl[iROC]->GetXaxis()->SetTitle("Event Number");
-		meanPhROC_3cl[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
-		meanPhROC_3cl[iROC]->SetMinimum(0);
-		meanPhROC_3cl[iROC]->SetMaximum(numEntries);
-		meanPhROC_3cl[iROC]->SetLineColor(2); // red
-		meanPhROC_3cl[iROC]->SetMarkerColor(2); // red
-
-		meanPhROC_M4cl[iROC] = new TGraphErrors(mean1Dbins);
-		TString tgraph_name_mean_pulse_height_M4cl = TString::Format("meanPHROC%d_M4cl",iROC);
-		TString tgraph_title_mean_pulse_height_M4cl = TString::Format("Mean Pulse Height ROC%d M4pix cluster",iROC);
-		meanPhROC_M4cl[iROC]->SetName(tgraph_name_mean_pulse_height_M4cl);
-		meanPhROC_M4cl[iROC]->SetTitle(tgraph_title_mean_pulse_height_M4cl);
-		meanPhROC_M4cl[iROC]->GetXaxis()->SetTitle("Event Number");
-		meanPhROC_M4cl[iROC]->GetYaxis()->SetTitle("Average Pulse Height");
-		meanPhROC_M4cl[iROC]->SetMinimum(0);
-		meanPhROC_M4cl[iROC]->SetMaximum(numEntries);
-		meanPhROC_M4cl[iROC]->SetLineColor(6); // magenta
-		meanPhROC_M4cl[iROC]->SetMarkerColor(6); // magenta
 
 		// 2D Histograms
 		// ROC
@@ -484,7 +430,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString image_name_phD1("PhROC4D1.png");
 			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phD1,outputPath,image_name_phD1);
 			// TGraphErrors
-			TString canvas_name_phMeanD1("Pulse Height ROC 4 Diamond 1");
+			TString canvas_name_phMeanD1("Mean Pulse Height ROC4 Diamond 1");
 			TString image_name_phMeanD1("PhMeanROC4D1.png");
 			PlotTgraphsOverlay(meanPhROC_all[iROC],meanPhROC_1cl[iROC],meanPhROC_2cl[iROC],meanPhROC_3cl[iROC],meanPhROC_M4cl[iROC],canvas_name_phMeanD1,outputPath,image_name_phMeanD1);
 		}
@@ -507,7 +453,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString image_name_phD2("PhROC5D2.png");
 			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phD2,outputPath,image_name_phD2);
 			// TGraphErrors
-			TString canvas_name_phMeanD2("Pulse Height ROC 5 Diamond 2");
+			TString canvas_name_phMeanD2("Mean Pulse Height ROC5 Diamond 2");
 			TString image_name_phMeanD2("PhMeanROC5D2.png");
 			PlotTgraphsOverlay(meanPhROC_all[iROC],meanPhROC_1cl[iROC],meanPhROC_2cl[iROC],meanPhROC_3cl[iROC],meanPhROC_M4cl[iROC],canvas_name_phMeanD2,outputPath,image_name_phMeanD2);
 		}
@@ -528,9 +474,9 @@ void Prueba(char *rootFilePath,char *outputPath){
 			// 1D
 			TString canvas_name_phSi("Pulse Height ROC6 Silicon");
 			TString image_name_phSi("PhROC6Si.png");
-			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phSi,outputPath,image_name_phSi);// TGraphErrors
+			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_phSi,outputPath,image_name_phSi);
 			// TGraphErrors
-			TString canvas_name_phMeanSi("Pulse Height ROC 6 Silicon");
+			TString canvas_name_phMeanSi("Mean Pulse Height ROC6 Silicon");
 			TString image_name_phMeanSi("PhMeanROC6Si.png");
 			PlotTgraphsOverlay(meanPhROC_all[iROC],meanPhROC_1cl[iROC],meanPhROC_2cl[iROC],meanPhROC_3cl[iROC],meanPhROC_M4cl[iROC],canvas_name_phMeanSi,outputPath,image_name_phMeanSi);
 		}
@@ -553,12 +499,11 @@ void Prueba(char *rootFilePath,char *outputPath){
 			TString image_name_ph(Form("PhROC%d.png",iROC));
 			PlotPulseHeightsOverlay(phROC_all[iROC],phROC_1cl[iROC],phROC_2cl[iROC],phROC_3cl[iROC],phROC_M4cl[iROC],kFALSE,kFALSE,canvas_name_ph,outputPath,image_name_ph);
 			// TGraphErrors
-			TString canvas_name_phMean(Form("Pulse Height ROC%d",iROC));
+			TString canvas_name_phMean(Form("Mean Pulse Height ROC%d",iROC));
 			TString image_name_phMean(Form("PhMeanROC%d.png",iROC));
 			PlotTgraphsOverlay(meanPhROC_all[iROC],meanPhROC_1cl[iROC],meanPhROC_2cl[iROC],meanPhROC_3cl[iROC],meanPhROC_M4cl[iROC],canvas_name_phMean,outputPath,image_name_phMean);
 		}
 	}
-
 	// Save histograms
 	TFile f(Form("%s%s",outputPath,histogramOutputFile),"RECREATE");
 	coincidenceMap->Write();
@@ -572,10 +517,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 		phROC_3cl[iROC]->Write();
 		phROC_M4cl[iROC]->Write();
 	}
-
 	f.Close();
-
-
 }
 
 void DoAveragePulseHeight(Long64_t ievent, int numCl, Int_t iROC, vector<float> *ph1, vector<float> *ph2, vector<float> *ph3, vector<float> *phM4, TGraphErrors *phGall, TGraphErrors *phG1, TGraphErrors *phG2, TGraphErrors *phG3, TGraphErrors *phGM4){
@@ -605,33 +547,33 @@ void DoAveragePulseHeight(Long64_t ievent, int numCl, Int_t iROC, vector<float> 
 		phGM4->SetPointError((Int_t)nPointsTGraph,binWidthTGraph/2,valueAverage[iROC][4]/sqrt(nAverage[iROC][4]));
 		nAverage[iROC][4]=0;
 		valueAverage[iROC][4]=0;
-		nPointsTGraph++;
+		if(iROC == 6)// If it is the last ROC to have entered the data increase nPointsTGraph to start new average segment
+			nPointsTGraph++;
 	}
 	if (numCl != 0){
 		for(Int_t i =0; i< ph1->size(); i++){
 			valueAverage[iROC][0]=valueAverage[iROC][0]*nAverage[iROC][0]/((float)nAverage[iROC][0]+1)+ph1->at(i)/((float)nAverage[iROC][0]+1);
-			nAverage[iROC][0]=nAverage[iROC][0]+1;
+			nAverage[iROC][0]++;
 			valueAverage[iROC][1]=valueAverage[iROC][1]*nAverage[iROC][1]/((float)nAverage[iROC][1]+1)+ph1->at(i)/((float)nAverage[iROC][1]+1);
-			nAverage[iROC][1]=nAverage[iROC][1]+1;
+			nAverage[iROC][1]++;
 		}
-		for(Int_t i =0; i< ph2->size(); i++){
-			float temp = (valueAverage[iROC][0])*(nAverage[iROC][0])/((float)(nAverage[iROC][0])+1)+(ph1->at(i))/((float)(nAverage[iROC][0])+1);cout << "BLAst" <<endl;
-			valueAverage[iROC][0]=temp;cout << "BLA" <<endl;
-			nAverage[iROC][0]=nAverage[iROC][0]+1;cout << "BLA" <<endl;
-			valueAverage[iROC][2]=valueAverage[iROC][2]*nAverage[iROC][2]/((float)nAverage[iROC][2]+1)+ph1->at(i)/((float)nAverage[iROC][2]+1);cout << "BLA" <<endl;
-			nAverage[iROC][2]=nAverage[iROC][2]+1;cout << "BLA" <<endl;
+		for(Int_t i = 0; i < ph2->size(); i++){
+			valueAverage[iROC][0]=valueAverage[iROC][0]*nAverage[iROC][0]/((float)nAverage[iROC][0]+1)+ph2->at(i)/((float)nAverage[iROC][0]+1);
+			nAverage[iROC][0]++;
+			valueAverage[iROC][2]=valueAverage[iROC][2]*nAverage[iROC][2]/((float)nAverage[iROC][2]+1)+ph2->at(i)/((float)nAverage[iROC][2]+1);
+			nAverage[iROC][2]++;
 		}
 		for(Int_t i =0; i< ph3->size(); i++){
-			valueAverage[iROC][0]=valueAverage[iROC][0]*nAverage[iROC][0]/((float)nAverage[iROC][0]+1)+ph1->at(i)/((float)nAverage[iROC][0]+1);
-			nAverage[iROC][0]=nAverage[iROC][0]+1;
-			valueAverage[iROC][3]=valueAverage[iROC][3]*nAverage[iROC][3]/((float)nAverage[iROC][3]+1)+ph1->at(i)/((float)nAverage[iROC][3]+1);
-			nAverage[iROC][3]=nAverage[iROC][3]+1;
+			valueAverage[iROC][0]=valueAverage[iROC][0]*nAverage[iROC][0]/((float)nAverage[iROC][0]+1)+ph3->at(i)/((float)nAverage[iROC][0]+1);
+			nAverage[iROC][0]++;
+			valueAverage[iROC][3]=valueAverage[iROC][3]*nAverage[iROC][3]/((float)nAverage[iROC][3]+1)+ph3->at(i)/((float)nAverage[iROC][3]+1);
+			nAverage[iROC][3]++;
 		}
 		for(Int_t i =0; i< phM4->size(); i++){
 			valueAverage[iROC][0]=valueAverage[iROC][0]*nAverage[iROC][0]/((float)nAverage[iROC][0]+1)+phM4->at(i)/((float)nAverage[iROC][0]+1);
-			nAverage[iROC][0]=nAverage[iROC][0]+1;
+			nAverage[iROC][0]++;
 			valueAverage[iROC][4]=valueAverage[iROC][4]*nAverage[iROC][4]/((float)nAverage[iROC][4]+1)+phM4->at(i)/((float)nAverage[iROC][4]+1);
-			nAverage[iROC][4]=nAverage[iROC][4]+1;
+			nAverage[iROC][4]++;
 		}
 	}
 }
@@ -691,15 +633,17 @@ void PlotTgraphsOverlay(TGraphErrors *gall, TGraphErrors *g1, TGraphErrors *g2, 
 	gStyle->SetOptStat(0);
 	TCanvas *c1 = new TCanvas("c1",title,1);
 	c1->cd();
-	TMultiGraph *mg = new TMultiGraph();
-	mg->SetTitle(title);
+	TMultiGraph *mg = new TMultiGraph(suffix,title);
 	mg->Add(gall);
 	mg->Add(g1);
 	mg->Add(g2);
 	mg->Add(g3);
 	mg->Add(gM4);
+	c1->cd();
 	mg->Draw("ALP");
 	c1->SaveAs(Form("%s%s",outputPath,suffix));
+	delete c1;
+	delete mg;
 }
 
 void PlotPulseHeightsOverlay(TH1F *phall, TH1F *ph1, TH1F *ph2, TH1F *ph3, TH1F *phM4, Bool_t logY, Bool_t logX, const char *title, const char *outputPath, const char *suffix){
@@ -719,6 +663,7 @@ void PlotPulseHeightsOverlay(TH1F *phall, TH1F *ph1, TH1F *ph2, TH1F *ph3, TH1F 
 	phM4->Draw("p e0 same");
 	phM4->Draw("hist same");
 	c1->SaveAs(Form("%s%s",outputPath,suffix));
+	delete c1;
 }
 
 void PlotHistogram2D(TH2F *histogram, const char *title, const char *outputPath, const char *suffix){
