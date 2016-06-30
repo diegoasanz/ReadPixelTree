@@ -85,7 +85,7 @@ Int_t contour2D = 1024, mean1Dbins = 100, numBinCol = 52, numBinRow = 80, minCol
 Float_t xminR1 = -6.075, xmaxR1 = 6.075, yminR1 = -6.05, ymaxR1 = 6.05, ph1Dmin=0, ph1Dmax=50000;
 Int_t divXR1 = 81, divYR1 = 121, ph1Dbins=100;
 Float_t deltaXR1 = (Float_t)((xmaxR1-xminR1)/divXR1), deltaYR1 = (Float_t)((ymaxR1-yminR1)/divYR1);
-Double_t  binWidthTGraph=2000;
+Double_t  binWidthTGraph=200000;
 vector<vector<int>> nAverage(7, vector<int>(5));
 vector<vector<float>> valueAverage(7, vector<float>(5));
 Int_t nPointsTGraph = 0;
@@ -94,8 +94,8 @@ int main() {
 	gROOT->ProcessLine("#include <vector>");
 	gSystem->Load("libMathCore");
 	gSystem->Load("libPhysics");
-	const char *rootFilePath = rootFilePathSmall;
-	const char *outputPath = outputPathSmall;
+	const char *rootFilePath = rootFilePathComplete;
+	const char *outputPath = outputPathComplete;
 	cout << "Starting Analysis" << endl;
 	Prueba((char *)rootFilePath, (char *)outputPath);
 	return 0;
@@ -335,7 +335,7 @@ void Prueba(char *rootFilePath,char *outputPath){
 
 	cout << "Reading first entry." << endl;
 
-	for(Long64_t i = 0; i < numEntries; i++){
+	for(Long64_t i = 0; i < numEntries; i++){//numEntries
 		chain1->GetEntry(i);
 		numPlane = plane->size();
 		numCol = col->size();
